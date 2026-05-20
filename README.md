@@ -15,6 +15,8 @@
 |-----------|-------|
 | 🎯 **YouTube Transcript** | Lấy transcript/caption có sẵn từ YouTube |
 | 🎤 **Speech-to-Text Offline** | Tự động tải audio + chuyển thành text bằng faster-whisper |
+| ⬇️ **Download Video** | Tải video chất lượng cao (best video+audio) từ YouTube |
+| ⏱️ **Timestamps Toggle** | Bật/tắt hiển thị timestamp trong transcript |
 | 📋 **Copy to Clipboard** | Copy transcript chỉ với 1 click |
 | 💾 **Export TXT** | Xuất plain text với timestamp |
 | 📝 **Export Markdown** | Xuất Obsidian-friendly markdown với metadata |
