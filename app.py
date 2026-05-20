@@ -589,7 +589,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             self.after(0, lambda: self._fill_and_process(url))
             
     def _fill_and_process(self, url: str):
-        """Fill URL entry, bring app to front, and start processing."""
+        """Fill URL entry and bring app to front."""
         # Bring window to front
         self.deiconify()
         self.lift()
@@ -600,10 +600,6 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # Fill entry
         self.url_entry.delete(0, "end")
         self.url_entry.insert(0, url)
-        
-        # Determine whether to download or get transcript based on mode/format?
-        # Defaulting to getting transcript like a normal paste+enter
-        self._on_get_transcript()
 
     def _on_get_transcript(self):
         """Handle Get Transcript button click."""
