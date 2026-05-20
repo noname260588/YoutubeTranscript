@@ -89,8 +89,9 @@ YoutubeTranscript/
 ├── icon.ico                 # App icon
 ├── author.png               # Ảnh About dialog
 ├── help.png                 # Ảnh hướng dẫn sử dụng
-├── ffmpeg/                  # FFmpeg executable (tự đặt vào)
-│   └── ffmpeg.exe
+├── ffmpeg/                  # FFmpeg binaries used by PyInstaller bundling
+│   ├── ffmpeg.exe
+│   └── ffprobe.exe
 ├── models/                  # Whisper models (auto-download lần đầu)
 ├── downloads/               # Audio files tạm (tự tạo khi chạy)
 └── exports/                 # Transcript files đã export
@@ -181,13 +182,13 @@ build.bat
 
 Output: `dist/YouTubeKnowledgeClipper.exe`
 
-> ⚠️ **Lưu ý**: Bản build hiện dùng PyInstaller `--onefile`. Sau khi build, đặt các thư mục runtime `ffmpeg/`, `models/`, `downloads/`, `exports/` cùng cấp với file `dist/YouTubeKnowledgeClipper.exe` nếu cần chạy STT/download/export ở bản portable.
+> ⚠️ **Lưu ý**: Bản build dùng PyInstaller `--onefile` và nhúng `ffmpeg/ffmpeg.exe` cùng `ffmpeg/ffprobe.exe` vào trong file `.exe`. Trước khi build, cần có các binary này trong thư mục `ffmpeg/`; nếu thiếu, `build.bat` sẽ thử copy từ system PATH.
 
 ---
 
 ## ⚠️ Lưu ý quan trọng
 
-- **FFmpeg**: Cần đặt `ffmpeg.exe` vào thư mục `ffmpeg/` cạnh `app.py` (hoặc cài vào system PATH) để sử dụng Speech-to-Text mode.
+- **FFmpeg**: Khi chạy từ source, app tìm `ffmpeg/ffmpeg.exe` cạnh `app.py` hoặc FFmpeg trong system PATH. Khi chạy bản `.exe` đã build, FFmpeg được nhúng sẵn trong file onefile.
 - **Whisper Model**: Lần chạy đầu tiên ở mode STT sẽ tự động download model từ Hugging Face (~460MB cho `small`). Cần có internet.
 - **Transcript mode**: Phụ thuộc vào việc video có caption/phụ đề hay không. Nhiều video không có sẵn transcript.
 - **Hiệu suất STT**: Chạy trên CPU nên video dài có thể mất vài phút. Model `tiny` nhanh nhất nếu cần tốc độ.
