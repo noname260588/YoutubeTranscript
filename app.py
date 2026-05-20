@@ -20,6 +20,7 @@ from utils import (
     extract_video_id,
     ensure_dirs,
     get_base_dir,
+    get_asset_path,
     sanitize_filename,
     get_current_date,
     get_ffmpeg_path,
@@ -85,7 +86,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         # App icon
         try:
-            icon_path = get_base_dir() / "icon.ico"
+            icon_path = get_asset_path("icon.ico")
             if icon_path.exists():
                 self.iconbitmap(str(icon_path))
         except Exception:
@@ -140,7 +141,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # Small corner app icon
         try:
             from PIL import Image
-            icon_path = get_base_dir() / "icon.ico"
+            icon_path = get_asset_path("icon.ico")
             if icon_path.exists():
                 sheep_img = ctk.CTkImage(
                     light_image=Image.open(str(icon_path)),
@@ -630,9 +631,9 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # Try to load author.png or author.jpg
         try:
             from PIL import Image
-            author_path = get_base_dir() / "author.png"
+            author_path = get_asset_path("author.png")
             if not author_path.exists():
-                author_path = get_base_dir() / "author.jpg"
+                author_path = get_asset_path("author.jpg")
                 
             if author_path.exists():
                 img = Image.open(str(author_path))

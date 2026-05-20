@@ -25,6 +25,18 @@ def get_base_dir() -> Path:
         # Running as Python script → use the folder where this .py file is
         return Path(__file__).parent.resolve()
 
+def get_asset_path(filename: str) -> Path:
+    """
+    Get the absolute path to a resource (icon, image).
+    Works for dev environment and for PyInstaller bundle.
+    """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = Path(sys._MEIPASS)
+    except AttributeError:
+        base_path = Path(__file__).parent.resolve()
+        
+    return base_path / filename
 
 def extract_video_id(url: str) -> str:
     """
