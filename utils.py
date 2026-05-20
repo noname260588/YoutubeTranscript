@@ -5,14 +5,25 @@ Includes URL parsing, timestamp formatting, filename sanitization, and directory
 
 import re
 import os
+import sys
 import shutil
 from pathlib import Path
 from datetime import datetime
 
 
 def get_base_dir() -> Path:
-    """Get the base directory of the application (where app.py lives)."""
-    return Path(__file__).parent.resolve()
+    """
+    Get the base directory of the application.
+
+    - When running as .py script: returns the directory containing app.py
+    - When running as PyInstaller .exe: returns the directory containing the .exe file
+    """
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller EXE → use the folder where .exe is located
+        return Path(sys.executable).parent.resolve()
+    else:
+        # Running as Python script → use the folder where this .py file is
+        return Path(__file__).parent.resolve()
 
 
 def extract_video_id(url: str) -> str:
