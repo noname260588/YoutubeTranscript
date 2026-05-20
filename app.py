@@ -26,8 +26,13 @@ from utils import (
     get_ffmpeg_path,
 )
 from transcript_service import get_youtube_transcript, TranscriptNotFoundError
-from audio_service import download_audio, AudioDownloadError, get_video_info
-from video_service import download_video, VideoDownloadError
+from audio_service import (
+    download_audio,
+    AudioDownloadCancelledError,
+    AudioDownloadError,
+    get_video_info,
+)
+from video_service import download_video, VideoDownloadCancelledError, VideoDownloadError
 from whisper_service import transcribe_audio, WhisperTranscriptionError
 from export_service import (
     export_txt,
@@ -97,6 +102,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.current_segments: list[dict] = []
         self.current_metadata: dict = {}
         self.is_processing = False
+        self.cancel_event = threading.Event()
 
         # ─── Ensure Directories ──────────────────────────────────
         ensure_dirs()
@@ -221,7 +227,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=C_TEXT_DIM,
         )
-        url_label.grid(row=0, column=0, columnspan=3, sticky="w", padx=16, pady=(12, 4))
+        url_label.grid(row=0, column=0, columnspan=4, sticky="w", padx=16, pady=(12, 4))
 
         self.url_entry = ctk.CTkEntry(
             self.input_card,
@@ -242,7 +248,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             font=ctk.CTkFont(size=11, slant="italic"),
             text_color=C_TEXT_DIM,
         )
-        hint_label.grid(row=2, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 10))
+        hint_label.grid(row=2, column=0, columnspan=4, sticky="w", padx=16, pady=(0, 10))
 
         self.get_btn = ctk.CTkButton(
             self.input_card,
@@ -268,7 +274,21 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             corner_radius=10,
             command=self._on_download_video,
         )
-        self.download_video_btn.grid(row=1, column=2, sticky="e", padx=(0, 16), pady=(0, 4))
+        self.download_video_btn.grid(row=1, column=2, sticky="e", padx=(0, 8), pady=(0, 4))
+
+        self.cancel_btn = ctk.CTkButton(
+            self.input_card,
+            text="⛔ Hủy",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            height=42,
+            width=110,
+            fg_color=C_RED,
+            hover_color=self._lighten_color(C_RED),
+            corner_radius=10,
+            state="disabled",
+            command=self._on_cancel_processing,
+        )
+        self.cancel_btn.grid(row=1, column=3, sticky="e", padx=(0, 16), pady=(0, 4))
 
     def _build_options_section(self, row: int):
         """Options: Language, Mode, Whisper settings, Show timestamps toggle."""
@@ -392,7 +412,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         # ── Row 2-3: Video Quality
         self._make_option_label(self.options_card, "🎞️ Video Quality", 2, 1)
-        self.video_quality_var = ctk.StringVar(value="Best")
+        self.video_quality_var = ctk.StringVar(value="480p")
         self.video_quality_dropdown = ctk.CTkOptionMenu(
             self.options_card,
             variable=self.video_quality_var,
@@ -547,14 +567,24 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             font=ctk.CTkFont(size=12),
             text_color=C_ACCENT_2,
             anchor="w",
+            wraplength=600,
         )
         self.status_label.pack(side="left", padx=16, pady=6)
+
+        self.progress_value_label = ctk.CTkLabel(
+            self.status_frame,
+            text="",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=C_TEXT_DIM,
+            width=48,
+        )
 
         # Progress bar (hidden)
         self.progress_bar = ctk.CTkProgressBar(
             self.status_frame,
             mode="indeterminate",
-            height=3,
+            height=5,
+            width=180,
             progress_color=C_ACCENT,
             fg_color=C_BG_INPUT,
             corner_radius=2,
@@ -570,23 +600,93 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             self.status_label.configure(text=text, text_color=color)
         self.after(0, _update)
 
+    def _set_progress(self, value: float | None = None, label: str | None = None):
+        """Update progress bar in indeterminate or determinate mode."""
+        def _update():
+            if value is None:
+                self.progress_bar.stop()
+                self.progress_bar.configure(mode="indeterminate")
+                self.progress_bar.start()
+                if label:
+                    self.progress_value_label.configure(text=label)
+                return
+
+            progress = max(0.0, min(float(value), 1.0))
+            self.progress_bar.stop()
+            self.progress_bar.configure(mode="determinate")
+            self.progress_bar.set(progress)
+            self.progress_value_label.configure(text=f"{int(progress * 100):d}%")
+        self.after(0, _update)
+
+    def _on_task_progress(
+        self,
+        text: str,
+        color: str = C_ACCENT,
+        progress: float | None = None,
+    ):
+        """Update status and optional determinate progress from worker threads."""
+        self._set_status(text, color)
+        if progress is not None:
+            self._set_progress(progress)
+
+    def _set_controls_enabled(self, enabled: bool):
+        """Enable/disable controls that should not change while a task is running."""
+        state = "normal" if enabled else "disabled"
+        controls = [
+            self.url_entry,
+            self.language_dropdown,
+            self.mode_dropdown,
+            self.whisper_model_dropdown,
+            self.timestamps_switch,
+            self.download_format_dropdown,
+            self.video_quality_dropdown,
+            self.cookie_browser_dropdown,
+            *self.action_buttons,
+        ]
+
+        for control in controls:
+            try:
+                control.configure(state=state)
+            except Exception:
+                pass
+
+        if enabled:
+            self._on_format_change(self.download_format_var.get())
+
     def _set_processing(self, active: bool, button: str = "all"):
         """Enable/disable processing state (thread-safe)."""
         def _update():
             self.is_processing = active
             if active:
+                self._set_controls_enabled(False)
                 if button in ("all", "transcript"):
                     self.get_btn.configure(state="disabled", text="⏳ Processing...")
                 if button in ("all", "video"):
                     self.download_video_btn.configure(state="disabled", text="⏳ Downloading...")
-                self.progress_bar.pack(side="right", padx=16, fill="x", expand=True)
+                self.cancel_btn.configure(state="normal", text="⛔ Hủy")
+                self.progress_value_label.configure(text="...")
+                self.progress_value_label.pack(side="right", padx=(8, 16), pady=6)
+                self.progress_bar.pack(side="right", padx=(8, 0), fill="x", expand=True)
+                self.progress_bar.configure(mode="indeterminate")
                 self.progress_bar.start()
             else:
+                self._set_controls_enabled(True)
                 self.get_btn.configure(state="normal", text="⚡ Get Transcript")
                 self.download_video_btn.configure(state="normal", text="⬇️ Download")
+                self.cancel_btn.configure(state="disabled", text="⛔ Hủy")
                 self.progress_bar.stop()
+                self.progress_bar.set(0)
                 self.progress_bar.pack_forget()
+                self.progress_value_label.pack_forget()
         self.after(0, _update)
+
+    def _on_cancel_processing(self):
+        """Request cancellation for the active background task."""
+        if not self.is_processing:
+            return
+        self.cancel_event.set()
+        self.cancel_btn.configure(state="disabled", text="Đang hủy...")
+        self._set_status("⛔ Đang hủy tác vụ...", C_ORANGE)
 
     def _set_output(self, text: str):
         """Set output textbox content (thread-safe)."""
@@ -981,6 +1081,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         if language == "auto":
             language = "auto"
 
+        self.cancel_event.clear()
         thread = threading.Thread(
             target=self._process_transcript,
             args=(url, video_id, mode, language),
@@ -1005,6 +1106,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             messagebox.showerror("URL không hợp lệ", str(e))
             return
 
+        self.cancel_event.clear()
         thread = threading.Thread(
             target=self._process_download_video,
             args=(url,),
@@ -1028,7 +1130,12 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 format_type=format_type,
                 quality=quality,
                 cookie_browser=cookie_browser,
-                progress_callback=lambda msg: self._set_status(f"⬇️ {msg}", C_ACCENT)
+                cancel_event=self.cancel_event,
+                progress_callback=lambda msg, progress=None: self._on_task_progress(
+                    f"⬇️ {msg}",
+                    C_ACCENT,
+                    progress,
+                )
             )
             
             self._set_status(f"🎉 Đã tải xong: {title}", C_ACCENT_2)
@@ -1044,6 +1151,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                         
             self.after(500, ask_open)
             
+        except VideoDownloadCancelledError:
+            self._set_status("⛔ Đã hủy tải file", C_ORANGE)
         except VideoDownloadError as e:
             self._set_status("❌ Lỗi tải file", C_RED)
             self.after(0, lambda: messagebox.showerror("Lỗi Tải Xuống", str(e)))
@@ -1112,6 +1221,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         except TranscriptNotFoundError as e:
             self._set_status(f"❌ {str(e).split(chr(10))[0]}", C_RED)
             self.after(0, lambda: messagebox.showwarning("Không có Transcript", str(e)))
+        except AudioDownloadCancelledError:
+            self._set_status("⛔ Đã hủy tải audio", C_ORANGE)
         except AudioDownloadError as e:
             self._set_status("❌ Lỗi tải audio", C_RED)
             self.after(0, lambda: messagebox.showerror("Lỗi Audio", str(e)))
@@ -1137,13 +1248,22 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         audio_path, title = download_audio(
             url,
             cookie_browser=self.cookie_browser_var.get(),
-            progress_callback=lambda msg: self._set_status(f"⬇️ {msg}", C_ACCENT),
+            cancel_event=self.cancel_event,
+            progress_callback=lambda msg, progress=None: self._on_task_progress(
+                f"⬇️ {msg}",
+                C_ACCENT,
+                progress,
+            ),
         )
+
+        if self.cancel_event.is_set():
+            raise AudioDownloadCancelledError("Đã hủy tải audio.")
 
         self.current_metadata = self.current_metadata or {}
         self.current_metadata["title"] = title
 
         self._set_status("🎤 Đang chạy Speech-to-Text...", C_PURPLE)
+        self._set_progress(None, "STT")
         model_size = self.whisper_model_var.get()
         whisper_lang = None if language == "auto" else language
 

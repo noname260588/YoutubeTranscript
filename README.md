@@ -16,6 +16,8 @@
 | 🎯 **YouTube Transcript** | Lấy transcript/caption có sẵn từ YouTube |
 | 🎤 **Speech-to-Text Offline** | Tự động tải audio + chuyển thành text bằng faster-whisper |
 | ⬇️ **Download Video/Audio** | Tải video MP4 hoặc audio M4A từ YouTube |
+| 📊 **Download Progress** | Hiển thị phần trăm, tốc độ và ETA khi `yt-dlp` cung cấp |
+| ⛔ **Cancel Download** | Hủy tác vụ tải video/audio đang chạy |
 | ⏱️ **Timestamps Toggle** | Bật/tắt hiển thị timestamp trong transcript |
 | 📋 **Copy to Clipboard** | Copy transcript chỉ với 1 click |
 | ⌨️ **Global Hotkey** | Bôi đen link YouTube và nhấn `Ctrl + Shift + C` để đưa link vào app |
@@ -115,7 +117,7 @@ YoutubeTranscript/
 | Tuỳ chọn | Giá trị |
 |---------|---------|
 | **Format** | `Video (MP4)`, `Audio (M4A)` |
-| **Video Quality** | `Best`, `1080p`, `720p`, `480p` |
+| **Video Quality** | `480p` mặc định để tải nhanh; có thể chọn `Best`, `1080p`, `720p`, `480p` |
 | **Browser Cookies** | `Auto`, `None`, `Edge`, `Chrome`, `Firefox`, `Brave`, `Vivaldi`, `Opera` |
 
 > **Browser Cookies = Auto**: App tải thường trước. Nếu YouTube trả lỗi `Sign in to confirm you’re not a bot`, app sẽ thử lại bằng cookies từ các trình duyệt có cookie database trên máy. Cách này yêu cầu bạn đã đăng nhập YouTube trong trình duyệt đó.

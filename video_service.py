@@ -11,7 +11,10 @@ from utils import (
     get_cookie_browser_attempts,
     get_ffmpeg_dir,
     get_ffmpeg_path,
+    get_yt_dlp_progress,
+    format_yt_dlp_progress_message,
     looks_like_youtube_auth_error,
+    notify_progress,
     sanitize_filename,
 )
 
@@ -19,12 +22,19 @@ class VideoDownloadError(Exception):
     """Raised when video download fails."""
     pass
 
+
+class VideoDownloadCancelledError(VideoDownloadError):
+    """Raised when the user cancels a video/audio download."""
+    pass
+
+
 def download_video(
     video_url: str,
     output_dir: str = "downloads",
     format_type: str = "Video (MP4)",
-    quality: str = "Best",
+    quality: str = "480p",
     cookie_browser: str | None = "Auto",
+    cancel_event=None,
     progress_callback=None
 ) -> tuple[str, str]:
     """
@@ -37,6 +47,7 @@ def download_video(
         quality: "Best", "1080p", "720p", "480p".
         cookie_browser: Browser to read cookies from if YouTube requires login.
                         'Auto' tries anonymous first, then common browsers.
+        cancel_event: Optional threading.Event used to cancel an active download.
         progress_callback: Optional callback function for progress updates.
                           Called with (status_message: str).
 
@@ -72,13 +83,15 @@ def download_video(
     video_title = ["Unknown"]
 
     def progress_hook(d):
+        if cancel_event and cancel_event.is_set():
+            raise yt_dlp.utils.DownloadCancelled("Người dùng đã hủy tải file.")
+
         if d['status'] == 'downloading':
-            if progress_callback:
-                percent = d.get('_percent_str', '?')
-                progress_callback(f"Đang tải video/audio... {percent}")
+            progress = get_yt_dlp_progress(d)
+            message = format_yt_dlp_progress_message("Đang tải video/audio...", d)
+            notify_progress(progress_callback, message, progress)
         elif d['status'] == 'finished':
-            if progress_callback:
-                progress_callback("Đang xử lý/merge file...")
+            notify_progress(progress_callback, "Đang xử lý/merge file...", 1.0)
 
     ffmpeg_dir = get_ffmpeg_dir()
 
@@ -127,9 +140,15 @@ def download_video(
     last_error = None
 
     for browser in attempts:
+        if cancel_event and cancel_event.is_set():
+            raise VideoDownloadCancelledError("Đã hủy tải file.")
+
         current_opts = apply_cookie_browser_option(ydl_opts, browser)
-        if browser and progress_callback:
-            progress_callback(f"YouTube yêu cầu xác thực. Đang thử cookies từ {browser}...")
+        if browser:
+            notify_progress(
+                progress_callback,
+                f"YouTube yêu cầu xác thực. Đang thử cookies từ {browser}...",
+            )
 
         try:
             with yt_dlp.YoutubeDL(current_opts) as ydl:
@@ -152,6 +171,8 @@ def download_video(
 
                 raise VideoDownloadError(f"Tải thành công nhưng không tìm thấy file {ext.upper()}.")
 
+        except yt_dlp.utils.DownloadCancelled:
+            raise VideoDownloadCancelledError("Đã hủy tải file.")
         except yt_dlp.utils.DownloadError as e:
             last_error = e
             if browser is None:

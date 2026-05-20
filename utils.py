@@ -335,3 +335,37 @@ def looks_like_youtube_auth_error(error_message: str) -> bool:
             "confirm you’re not a bot",
         )
     )
+
+
+def get_yt_dlp_progress(progress_info: dict) -> float | None:
+    """Return a 0..1 progress value from a yt-dlp progress hook payload."""
+    downloaded = progress_info.get("downloaded_bytes")
+    total = progress_info.get("total_bytes") or progress_info.get("total_bytes_estimate")
+    if not downloaded or not total:
+        return None
+
+    try:
+        return max(0.0, min(float(downloaded) / float(total), 1.0))
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def format_yt_dlp_progress_message(prefix: str, progress_info: dict) -> str:
+    """Build a compact user-facing download progress message."""
+    percent = str(progress_info.get("_percent_str", "?")).strip()
+    speed = str(progress_info.get("_speed_str", "")).strip()
+    eta = str(progress_info.get("_eta_str", "")).strip()
+
+    parts = [part for part in (percent, speed, f"ETA {eta}" if eta else "") if part]
+    return f"{prefix} {' • '.join(parts)}" if parts else prefix
+
+
+def notify_progress(progress_callback, message: str, progress: float | None = None) -> None:
+    """Call progress callback while preserving compatibility with one-arg callbacks."""
+    if not progress_callback:
+        return
+
+    try:
+        progress_callback(message, progress)
+    except TypeError:
+        progress_callback(message)
