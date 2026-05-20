@@ -175,6 +175,19 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         version_label.pack(side="left", padx=(10, 0))
 
+        # About button
+        self.about_btn = ctk.CTkButton(
+            header_frame,
+            text="ℹ️ About",
+            width=70,
+            height=28,
+            fg_color="transparent",
+            hover_color=C_BORDER,
+            text_color=C_TEXT_DIM,
+            command=self._show_about
+        )
+        self.about_btn.pack(side="right")
+
     def _build_input_section(self, row: int):
         """URL input + Get Transcript button."""
         self.input_card = ctk.CTkFrame(
@@ -600,6 +613,54 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # Fill entry
         self.url_entry.delete(0, "end")
         self.url_entry.insert(0, url)
+
+    def _show_about(self):
+        """Show About dialog with author info and image."""
+        about_win = ctk.CTkToplevel(self)
+        about_win.title("About")
+        about_win.geometry("400x450")
+        about_win.attributes('-topmost', True)
+        
+        # Center the about window relative to main window
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 400) // 2
+        y = self.winfo_y() + (self.winfo_height() - 450) // 2
+        about_win.geometry(f"+{x}+{y}")
+        
+        # Try to load author.png or author.jpg
+        try:
+            from PIL import Image
+            author_path = get_base_dir() / "author.png"
+            if not author_path.exists():
+                author_path = get_base_dir() / "author.jpg"
+                
+            if author_path.exists():
+                img = Image.open(str(author_path))
+                # Resize keeping aspect ratio
+                img.thumbnail((250, 250))
+                ctk_img = ctk.CTkImage(light_image=img, size=img.size)
+                img_lbl = ctk.CTkLabel(about_win, text="", image=ctk_img)
+                img_lbl.pack(pady=(30, 10))
+        except Exception as e:
+            print(f"Cannot load author image: {e}")
+            
+        # Text
+        info_lbl = ctk.CTkLabel(
+            about_win,
+            text=f"{APP_TITLE} v{APP_VERSION}\n\nTác giả: Phuong\n\nCảm ơn bạn đã sử dụng phần mềm!",
+            font=ctk.CTkFont(size=14),
+            justify="center",
+            text_color=C_TEXT
+        )
+        info_lbl.pack(pady=20)
+        
+        close_btn = ctk.CTkButton(
+            about_win, 
+            text="Đóng", 
+            width=100,
+            command=about_win.destroy
+        )
+        close_btn.pack(pady=10)
 
     def _on_get_transcript(self):
         """Handle Get Transcript button click."""
