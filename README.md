@@ -118,7 +118,7 @@ YoutubeTranscript/
 | **Video Quality** | `Best`, `1080p`, `720p`, `480p` |
 | **Browser Cookies** | `Auto`, `None`, `Edge`, `Chrome`, `Firefox`, `Brave`, `Vivaldi`, `Opera` |
 
-> **Browser Cookies = Auto**: App tải thường trước. Nếu YouTube trả lỗi `Sign in to confirm you’re not a bot`, app sẽ thử lại bằng cookies từ các trình duyệt phổ biến. Cách này yêu cầu bạn đã đăng nhập YouTube trong trình duyệt đó.
+> **Browser Cookies = Auto**: App tải thường trước. Nếu YouTube trả lỗi `Sign in to confirm you’re not a bot`, app sẽ thử lại bằng cookies từ các trình duyệt có cookie database trên máy. Cách này yêu cầu bạn đã đăng nhập YouTube trong trình duyệt đó.
 
 ### Whisper Models
 

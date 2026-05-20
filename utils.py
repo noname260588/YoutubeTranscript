@@ -232,16 +232,81 @@ def normalize_cookie_browser(browser: str | None) -> str | None:
     return aliases.get(value, value)
 
 
+def _existing_paths(paths: list[Path]) -> list[Path]:
+    """Return paths that exist without raising on inaccessible profile folders."""
+    found = []
+    for path in paths:
+        try:
+            if path.exists():
+                found.append(path)
+        except OSError:
+            continue
+    return found
+
+
+def browser_cookie_store_exists(browser: str | None) -> bool:
+    """Return whether a supported browser appears to have a local cookie store."""
+    normalized = normalize_cookie_browser(browser)
+    local_app_data = Path(os.environ.get("LOCALAPPDATA", ""))
+    app_data = Path(os.environ.get("APPDATA", ""))
+
+    if normalized == "firefox":
+        profiles_root = app_data / "Mozilla" / "Firefox" / "Profiles"
+        try:
+            return any(profiles_root.glob("*/cookies.sqlite"))
+        except OSError:
+            return False
+
+    chromium_roots = {
+        "edge": local_app_data / "Microsoft" / "Edge" / "User Data",
+        "chrome": local_app_data / "Google" / "Chrome" / "User Data",
+        "brave": local_app_data / "BraveSoftware" / "Brave-Browser" / "User Data",
+        "vivaldi": local_app_data / "Vivaldi" / "User Data",
+    }
+
+    if normalized in chromium_roots:
+        root = chromium_roots[normalized]
+        cookie_paths = [
+            root / "Default" / "Network" / "Cookies",
+            root / "Default" / "Cookies",
+        ]
+        try:
+            cookie_paths.extend(root.glob("Profile *\\Network\\Cookies"))
+            cookie_paths.extend(root.glob("Profile *\\Cookies"))
+        except OSError:
+            pass
+        return bool(_existing_paths(cookie_paths))
+
+    if normalized == "opera":
+        root = app_data / "Opera Software" / "Opera Stable"
+        return bool(_existing_paths([
+            root / "Network" / "Cookies",
+            root / "Cookies",
+        ]))
+
+    return False
+
+
+def get_available_cookie_browsers() -> list[str]:
+    """Return priority-ordered browsers that appear to have cookie databases."""
+    return [
+        browser
+        for browser in COOKIE_BROWSER_PRIORITY
+        if browser_cookie_store_exists(browser)
+    ]
+
+
 def get_cookie_browser_attempts(browser: str | None) -> list[str | None]:
     """
     Return yt-dlp cookie browser attempts.
 
-    Auto means anonymous first, then common Windows browsers. The first anonymous
-    attempt keeps normal downloads fast and only uses browser cookies when needed.
+    Auto means anonymous first, then detected browser cookie stores. The first
+    anonymous attempt keeps normal downloads fast and only uses browser cookies
+    when needed.
     """
     normalized = normalize_cookie_browser(browser)
     if normalized == "auto":
-        return [None, *COOKIE_BROWSER_PRIORITY]
+        return [None, *get_available_cookie_browsers()]
     if normalized:
         return [normalized]
     return [None]

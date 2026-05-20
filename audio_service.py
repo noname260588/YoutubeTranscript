@@ -101,6 +101,8 @@ def download_audio(
         ydl_opts['ffmpeg_location'] = ffmpeg_dir
 
     attempts = get_cookie_browser_attempts(cookie_browser)
+    attempted_browsers = [browser for browser in attempts if browser]
+    first_auth_error = None
     last_error = None
 
     for browser in attempts:
@@ -134,6 +136,8 @@ def download_audio(
 
         except yt_dlp.utils.DownloadError as e:
             last_error = e
+            if browser is None:
+                first_auth_error = e
             should_retry = (
                 browser is None
                 and len(attempts) > 1
@@ -156,9 +160,12 @@ def download_audio(
                 f"Lỗi không xác định khi tải audio.\nChi tiết: {str(e)}"
             )
 
+    tried_text = ", ".join(attempted_browsers) if attempted_browsers else "không tìm thấy browser cookies trên máy"
+    main_error = first_auth_error or last_error
     raise AudioDownloadError(
-        "Không thể tải audio từ video dù đã thử browser cookies.\n"
-        f"Chi tiết cuối: {str(last_error)}\n\n"
+        "Không thể tải audio từ video.\n"
+        f"Đã thử browser cookies: {tried_text}\n"
+        f"Chi tiết chính: {str(main_error)}\n\n"
         "Gợi ý: mở YouTube và đăng nhập trên Edge/Chrome/Firefox, sau đó thử lại "
         "với Browser Cookies = Auto hoặc chọn đúng trình duyệt đang đăng nhập."
     )
