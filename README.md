@@ -19,6 +19,7 @@
 | ⏱️ **Timestamps Toggle** | Bật/tắt hiển thị timestamp trong transcript |
 | 📋 **Copy to Clipboard** | Copy transcript chỉ với 1 click |
 | ⌨️ **Global Hotkey** | Bôi đen link YouTube và nhấn `Ctrl + Shift + C` để đưa link vào app |
+| 🍪 **Browser Cookies** | Tự retry bằng cookies Edge/Chrome/Firefox khi YouTube yêu cầu đăng nhập |
 | 💾 **Export TXT** | Xuất plain text với timestamp |
 | 📝 **Export Markdown** | Xuất Obsidian-friendly markdown với metadata |
 | 🎬 **Export SRT** | Xuất phụ đề chuẩn SRT |
@@ -115,6 +116,9 @@ YoutubeTranscript/
 |---------|---------|
 | **Format** | `Video (MP4)`, `Audio (M4A)` |
 | **Video Quality** | `Best`, `1080p`, `720p`, `480p` |
+| **Browser Cookies** | `Auto`, `None`, `Edge`, `Chrome`, `Firefox`, `Brave`, `Vivaldi`, `Opera` |
+
+> **Browser Cookies = Auto**: App tải thường trước. Nếu YouTube trả lỗi `Sign in to confirm you’re not a bot`, app sẽ thử lại bằng cookies từ các trình duyệt phổ biến. Cách này yêu cầu bạn đã đăng nhập YouTube trong trình duyệt đó.
 
 ### Whisper Models
 
@@ -193,6 +197,7 @@ Output: `dist/YouTubeKnowledgeClipper.exe`
 - **Transcript mode**: Phụ thuộc vào việc video có caption/phụ đề hay không. Nhiều video không có sẵn transcript.
 - **Hiệu suất STT**: Chạy trên CPU nên video dài có thể mất vài phút. Model `tiny` nhanh nhất nếu cần tốc độ.
 - **Global hotkey**: `Ctrl + Shift + C` dùng thư viện `keyboard`; trên một số máy Windows có thể cần quyền phù hợp để bắt phím toàn cục.
+- **YouTube bot check**: Nếu gặp lỗi `Sign in to confirm you’re not a bot`, hãy đăng nhập YouTube trên Edge/Chrome/Firefox rồi để `Browser Cookies = Auto` hoặc chọn đúng trình duyệt đang đăng nhập.
 
 ---
 

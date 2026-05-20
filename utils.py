@@ -10,6 +10,8 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
+COOKIE_BROWSER_PRIORITY = ["edge", "chrome", "firefox", "brave", "vivaldi", "opera"]
+
 
 def get_base_dir() -> Path:
     """
@@ -207,3 +209,64 @@ def get_video_title_from_url(video_id: str) -> str:
     Actual title fetching is done in audio_service via yt-dlp.
     """
     return f"YouTube Video {video_id}"
+
+
+def normalize_cookie_browser(browser: str | None) -> str | None:
+    """Normalize a UI cookie-browser value for yt-dlp."""
+    if not browser:
+        return None
+
+    value = str(browser).strip().lower()
+    if value in ("none", "off", "disabled", "no cookies"):
+        return None
+    if value in ("auto", "automatic"):
+        return "auto"
+
+    aliases = {
+        "microsoft edge": "edge",
+        "ms edge": "edge",
+        "google chrome": "chrome",
+        "mozilla firefox": "firefox",
+        "brave browser": "brave",
+    }
+    return aliases.get(value, value)
+
+
+def get_cookie_browser_attempts(browser: str | None) -> list[str | None]:
+    """
+    Return yt-dlp cookie browser attempts.
+
+    Auto means anonymous first, then common Windows browsers. The first anonymous
+    attempt keeps normal downloads fast and only uses browser cookies when needed.
+    """
+    normalized = normalize_cookie_browser(browser)
+    if normalized == "auto":
+        return [None, *COOKIE_BROWSER_PRIORITY]
+    if normalized:
+        return [normalized]
+    return [None]
+
+
+def apply_cookie_browser_option(ydl_opts: dict, browser: str | None) -> dict:
+    """Return a copy of yt-dlp options with browser cookies enabled if requested."""
+    opts = dict(ydl_opts)
+    normalized = normalize_cookie_browser(browser)
+    if normalized and normalized != "auto":
+        opts["cookiesfrombrowser"] = (normalized, None, None, None)
+    return opts
+
+
+def looks_like_youtube_auth_error(error_message: str) -> bool:
+    """Detect YouTube bot/login errors that are worth retrying with browser cookies."""
+    message = str(error_message).lower()
+    return any(
+        marker in message
+        for marker in (
+            "sign in to confirm",
+            "not a bot",
+            "cookies-from-browser",
+            "use --cookies",
+            "confirm you're not a bot",
+            "confirm you’re not a bot",
+        )
+    )

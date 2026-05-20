@@ -46,6 +46,7 @@ WINDOW_HEIGHT = 720
 LANGUAGES = ["Auto", "vi", "en", "ja", "zh"]
 MODES = ["Auto", "Transcript Only", "Speech-to-Text Only"]
 WHISPER_MODELS = ["tiny", "base", "small", "medium"]
+COOKIE_BROWSERS = ["Auto", "None", "Edge", "Chrome", "Firefox", "Brave", "Vivaldi", "Opera"]
 
 # ─── Color Palette ───────────────────────────────────────────────
 C_BG_DARK = "#0d1117"
@@ -406,6 +407,24 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             width=180,
         )
         self.video_quality_dropdown.grid(row=3, column=1, padx=16, pady=(0, 16), sticky="w")
+
+        # ── Row 2-3: Browser Cookies
+        self._make_option_label(self.options_card, "🍪 Browser Cookies", 2, 2)
+        self.cookie_browser_var = ctk.StringVar(value="Auto")
+        self.cookie_browser_dropdown = ctk.CTkOptionMenu(
+            self.options_card,
+            variable=self.cookie_browser_var,
+            values=COOKIE_BROWSERS,
+            font=ctk.CTkFont(size=12),
+            fg_color=C_BG_INPUT,
+            button_color=C_BORDER,
+            button_hover_color=C_ACCENT,
+            dropdown_fg_color=C_BG_CARD,
+            dropdown_hover_color=C_ACCENT,
+            corner_radius=8,
+            width=150,
+        )
+        self.cookie_browser_dropdown.grid(row=3, column=2, padx=16, pady=(0, 16), sticky="w")
 
     def _on_format_change(self, choice):
         """Disable quality dropdown if Audio is selected."""
@@ -999,6 +1018,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         
         format_type = self.download_format_var.get()
         quality = self.video_quality_var.get()
+        cookie_browser = self.cookie_browser_var.get()
         
         try:
             self._set_status("⬇️ Đang khởi tạo tải xuống...", C_ACCENT)
@@ -1007,6 +1027,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 url,
                 format_type=format_type,
                 quality=quality,
+                cookie_browser=cookie_browser,
                 progress_callback=lambda msg: self._set_status(f"⬇️ {msg}", C_ACCENT)
             )
             
@@ -1073,7 +1094,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 }
 
                 try:
-                    info = get_video_info(url)
+                    info = get_video_info(url, self.cookie_browser_var.get())
                     if info.get("title") and info["title"] != "Unknown":
                         self.current_metadata["title"] = info["title"]
                 except Exception:
@@ -1115,6 +1136,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self._set_status("⬇️ Đang tải audio từ YouTube...", C_ACCENT)
         audio_path, title = download_audio(
             url,
+            cookie_browser=self.cookie_browser_var.get(),
             progress_callback=lambda msg: self._set_status(f"⬇️ {msg}", C_ACCENT),
         )
 

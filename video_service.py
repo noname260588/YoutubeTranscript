@@ -5,7 +5,15 @@ Downloads high-quality video from YouTube using yt-dlp and merges audio/video vi
 
 import os
 from pathlib import Path
-from utils import get_base_dir, sanitize_filename, get_ffmpeg_path, get_ffmpeg_dir
+from utils import (
+    apply_cookie_browser_option,
+    get_base_dir,
+    get_cookie_browser_attempts,
+    get_ffmpeg_dir,
+    get_ffmpeg_path,
+    looks_like_youtube_auth_error,
+    sanitize_filename,
+)
 
 class VideoDownloadError(Exception):
     """Raised when video download fails."""
@@ -16,6 +24,7 @@ def download_video(
     output_dir: str = "downloads",
     format_type: str = "Video (MP4)",
     quality: str = "Best",
+    cookie_browser: str | None = "Auto",
     progress_callback=None
 ) -> tuple[str, str]:
     """
@@ -26,6 +35,8 @@ def download_video(
         output_dir: Directory to save the file (relative to base dir).
         format_type: "Video (MP4)" or "Audio (M4A)".
         quality: "Best", "1080p", "720p", "480p".
+        cookie_browser: Browser to read cookies from if YouTube requires login.
+                        'Auto' tries anonymous first, then common browsers.
         progress_callback: Optional callback function for progress updates.
                           Called with (status_message: str).
 
@@ -110,30 +121,58 @@ def download_video(
     if ffmpeg_dir:
         ydl_opts['ffmpeg_location'] = ffmpeg_dir
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=True)
-            video_title[0] = info.get('title', 'Unknown')
-            
-            # Find the merged/downloaded file
-            title = sanitize_filename(info.get('title', 'download'))
-            ext = "m4a" if is_audio else "mp4"
-            expected_file = out_path / f"{title}.{ext}"
-            
-            if expected_file.exists():
-                return str(expected_file), video_title[0]
+    attempts = get_cookie_browser_attempts(cookie_browser)
+    last_error = None
+
+    for browser in attempts:
+        current_opts = apply_cookie_browser_option(ydl_opts, browser)
+        if browser and progress_callback:
+            progress_callback(f"YouTube yêu cầu xác thực. Đang thử cookies từ {browser}...")
+
+        try:
+            with yt_dlp.YoutubeDL(current_opts) as ydl:
+                info = ydl.extract_info(video_url, download=True)
+                video_title[0] = info.get('title', 'Unknown')
                 
-            # If title sanitization in yt-dlp is slightly different, check for latest file
-            files = list(out_path.glob(f"*.{ext}"))
-            if files:
-                latest = max(files, key=lambda f: f.stat().st_mtime)
-                return str(latest), video_title[0]
+                # Find the merged/downloaded file
+                title = sanitize_filename(info.get('title', 'download'))
+                ext = "m4a" if is_audio else "mp4"
+                expected_file = out_path / f"{title}.{ext}"
+                
+                if expected_file.exists():
+                    return str(expected_file), video_title[0]
+                    
+                # If title sanitization in yt-dlp is slightly different, check for latest file
+                files = list(out_path.glob(f"*.{ext}"))
+                if files:
+                    latest = max(files, key=lambda f: f.stat().st_mtime)
+                    return str(latest), video_title[0]
 
-            raise VideoDownloadError(f"Tải thành công nhưng không tìm thấy file {ext.upper()}.")
+                raise VideoDownloadError(f"Tải thành công nhưng không tìm thấy file {ext.upper()}.")
 
-    except yt_dlp.utils.DownloadError as e:
-        raise VideoDownloadError(f"Không thể tải video.\nChi tiết: {str(e)}")
-    except Exception as e:
-        if isinstance(e, VideoDownloadError):
-            raise
-        raise VideoDownloadError(f"Lỗi không xác định khi tải video.\nChi tiết: {str(e)}")
+        except yt_dlp.utils.DownloadError as e:
+            last_error = e
+            should_retry = (
+                browser is None
+                and len(attempts) > 1
+                and looks_like_youtube_auth_error(str(e))
+            ) or (browser is not None and len(attempts) > 1)
+
+            if should_retry:
+                continue
+
+            raise VideoDownloadError(f"Không thể tải video.\nChi tiết: {str(e)}")
+        except Exception as e:
+            if isinstance(e, VideoDownloadError):
+                raise
+            if browser is not None and len(attempts) > 1:
+                last_error = e
+                continue
+            raise VideoDownloadError(f"Lỗi không xác định khi tải video.\nChi tiết: {str(e)}")
+
+    raise VideoDownloadError(
+        "Không thể tải video dù đã thử browser cookies.\n"
+        f"Chi tiết cuối: {str(last_error)}\n\n"
+        "Gợi ý: mở YouTube và đăng nhập trên Edge/Chrome/Firefox, sau đó thử lại "
+        "với Browser Cookies = Auto hoặc chọn đúng trình duyệt đang đăng nhập."
+    )
