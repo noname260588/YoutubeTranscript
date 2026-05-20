@@ -25,6 +25,8 @@ echo.
 echo [3/3] Building executable (portable folder)...
 pyinstaller --noconsole ^
     --name YouTubeKnowledgeClipper ^
+    --icon icon.ico ^
+    --add-data "icon.ico;." ^
     --add-data "ffmpeg;ffmpeg" ^
     --hidden-import customtkinter ^
     --hidden-import faster_whisper ^
