@@ -24,9 +24,12 @@ if errorlevel 1 (
 echo.
 echo [3/3] Building executable (portable folder)...
 pyinstaller --noconsole ^
+    --noconfirm ^
+    --onefile ^
     --name YouTubeKnowledgeClipper ^
     --icon icon.ico ^
     --add-data "icon.ico;." ^
+    --add-data "author.png;." ^
     --add-data "ffmpeg;ffmpeg" ^
     --hidden-import customtkinter ^
     --hidden-import faster_whisper ^
