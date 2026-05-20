@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+import math
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from pathlib import Path
@@ -119,6 +120,301 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         # ─── Build UI ────────────────────────────────────────────
         self._build_ui()
+
+        # Hide the main window until the welcome loading animation completes.
+        self.withdraw()
+        self.after(80, self._show_welcome_effect)
+
+    def _show_main_window(self):
+        """Reveal and focus the main window after startup loading."""
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+        except Exception:
+            pass
+
+    def _show_welcome_effect(self):
+        """Show a short non-blocking welcome splash when the app starts."""
+        if getattr(self, "_welcome_splash", None):
+            try:
+                if self._welcome_splash.winfo_exists():
+                    return
+            except Exception:
+                pass
+
+        splash = ctk.CTkToplevel(self)
+        self._welcome_splash = splash
+        splash.overrideredirect(True)
+        splash.configure(fg_color=C_BG_DARK)
+
+        try:
+            splash.attributes("-alpha", 0.0)
+            splash.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        splash_width = 620
+        splash_height = 320
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - splash_width) // 2
+        y = (self.winfo_screenheight() - splash_height) // 2
+        splash.geometry(f"{splash_width}x{splash_height}+{x}+{y}")
+        splash.lift()
+
+        card = ctk.CTkFrame(
+            splash,
+            fg_color=C_BG_CARD,
+            corner_radius=14,
+            border_width=1,
+            border_color=C_BORDER,
+        )
+        card.pack(fill="both", expand=True, padx=14, pady=14)
+        card.grid_columnconfigure(0, minsize=188)
+        card.grid_columnconfigure(1, weight=1)
+
+        visual_canvas = tk.Canvas(
+            card,
+            width=168,
+            height=152,
+            bg=C_BG_CARD,
+            highlightthickness=0,
+            bd=0,
+        )
+        visual_canvas.grid(row=0, column=0, rowspan=3, padx=(24, 18), pady=(34, 0), sticky="n")
+
+        title_label = ctk.CTkLabel(
+            card,
+            text=APP_TITLE,
+            font=ctk.CTkFont(size=24, weight="bold"),
+            text_color=C_TEXT,
+            anchor="w",
+        )
+        title_label.grid(row=0, column=1, sticky="ew", padx=(0, 34), pady=(44, 0))
+
+        subtitle_label = ctk.CTkLabel(
+            card,
+            text="Sẵn sàng trích xuất transcript, tải video và chạy STT",
+            font=ctk.CTkFont(size=13),
+            text_color=C_TEXT_DIM,
+            anchor="w",
+            wraplength=340,
+        )
+        subtitle_label.grid(row=1, column=1, sticky="ew", padx=(0, 34), pady=(6, 0))
+
+        badge_label = ctk.CTkLabel(
+            card,
+            text="Transcript • Download • Whisper",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=C_ACCENT,
+            anchor="w",
+        )
+        badge_label.grid(row=2, column=1, sticky="ew", padx=(0, 34), pady=(18, 0))
+
+        progress = ctk.CTkProgressBar(
+            card,
+            mode="determinate",
+            height=6,
+            progress_color=C_ACCENT,
+            fg_color=C_BG_INPUT,
+            corner_radius=3,
+        )
+        progress.grid(row=3, column=0, columnspan=2, sticky="ew", padx=34, pady=(30, 8))
+        progress.set(0)
+
+        hint_label = ctk.CTkLabel(
+            card,
+            text="Click hoặc Esc để bỏ qua",
+            font=ctk.CTkFont(size=10),
+            text_color=C_TEXT_DIM,
+        )
+        hint_label.grid(row=4, column=0, columnspan=2, sticky="ew", padx=34, pady=(0, 22))
+
+        closed = {"value": False}
+
+        def draw_welcome_visual(step: int):
+            visual_canvas.delete("all")
+            width = 168
+            height = 152
+            center_x = width / 2
+            center_y = height / 2 + 2
+            scale = 1.42
+            pulse = (math.sin(step * 0.36) + 1) / 2
+            tilt = math.sin(step * 0.16) * 5 * scale
+            yaw = math.sin(step * 0.2) * 7 * scale
+
+            def sx(value: float) -> float:
+                return center_x + (value - 52) * scale
+
+            def sy(value: float) -> float:
+                return center_y + (value - 52) * scale
+
+            # Hologram base rings.
+            visual_canvas.create_oval(
+                sx(14),
+                sy(78),
+                sx(90),
+                sy(95),
+                outline="#263247",
+                width=2,
+            )
+            visual_canvas.create_oval(
+                sx(23),
+                sy(82),
+                sx(81),
+                sy(91),
+                outline="#1f6feb",
+                width=1,
+            )
+            visual_canvas.create_arc(
+                sx(10),
+                sy(74),
+                sx(94),
+                sy(98),
+                start=(step * 10) % 360,
+                extent=72,
+                outline=C_ACCENT_2,
+                width=2,
+                style="arc",
+            )
+
+            # Hologram scan lines.
+            for offset in range(0, 58, 9):
+                y = 26 + offset + math.sin(step * 0.2 + offset) * 1.4
+                visual_canvas.create_line(
+                    sx(24),
+                    sy(y),
+                    sx(80),
+                    sy(y),
+                    fill="#1f6feb",
+                    width=1,
+                )
+
+            # A pseudo-3D rounded play slab, drawn as layered polygons.
+            front = [
+                (sx(28) + yaw, sy(30) + tilt),
+                (sx(72) + yaw, sy(24) - tilt * 0.2),
+                (sx(82) - yaw * 0.3, sy(51)),
+                (sx(70) - yaw, sy(72) + tilt * 0.2),
+                (sx(29) - yaw * 0.2, sy(66) - tilt),
+                (sx(20) + yaw * 0.2, sy(48)),
+            ]
+            back = [(x + 10, y + 10) for x, y in front]
+
+            for index in range(len(front)):
+                next_index = (index + 1) % len(front)
+                side = [
+                    front[index],
+                    front[next_index],
+                    back[next_index],
+                    back[index],
+                ]
+                visual_canvas.create_polygon(side, fill="#11223a", outline="#1f6feb")
+
+            glow_color = C_PURPLE if pulse > 0.62 else C_ACCENT
+            visual_canvas.create_polygon(back, fill="#07111f", outline="#1f6feb", width=1)
+            visual_canvas.create_polygon(front, fill="#10243b", outline="#0a1320", width=5)
+            visual_canvas.create_polygon(front, fill="#10243b", outline=glow_color, width=2)
+
+            play_depth = 7 + pulse * 4
+            play_shadow = [
+                (sx(43) + yaw * 0.25 + play_depth, sy(38) + play_depth),
+                (sx(43) + yaw * 0.25 + play_depth, sy(60) + play_depth),
+                (sx(62) + yaw * 0.25 + play_depth, sy(49) + play_depth),
+            ]
+            play_front = [
+                (sx(43) + yaw * 0.25, sy(38)),
+                (sx(43) + yaw * 0.25, sy(60)),
+                (sx(62) + yaw * 0.25, sy(49)),
+            ]
+            visual_canvas.create_polygon(play_shadow, fill="#07111f", outline="")
+            visual_canvas.create_polygon(play_front, fill=C_ACCENT_2, outline="#b6f7c4", width=1)
+
+            # Orbiting hologram particles.
+            for i in range(5):
+                theta = step * 0.22 + (i * math.tau / 5)
+                ox = center_x + math.cos(theta) * 58
+                oy = center_y + math.sin(theta) * 27 + 12
+                radius = 2.2 + (i % 2) * 1.0
+                color = C_ACCENT_2 if i % 2 else C_ACCENT
+                visual_canvas.create_oval(ox - radius, oy - radius, ox + radius, oy + radius, fill=color, outline="")
+
+            for i, label in enumerate(("YT", "AI")):
+                theta = -step * 0.18 + (i * math.pi)
+                ox = center_x + math.cos(theta) * 50
+                oy = center_y + math.sin(theta) * 16 + 54
+                visual_canvas.create_rectangle(
+                    ox - 15,
+                    oy - 8,
+                    ox + 15,
+                    oy + 8,
+                    fill=C_BG_INPUT,
+                    outline=C_BORDER,
+                    width=1,
+                )
+                visual_canvas.create_text(
+                    ox,
+                    oy,
+                    text=label,
+                    fill=C_TEXT_DIM,
+                    font=("Segoe UI", 8, "bold"),
+                )
+
+            visual_canvas.create_text(
+                center_x,
+                18,
+                text="PLAY",
+                fill=C_ACCENT,
+                font=("Segoe UI", 11, "bold"),
+            )
+
+        def close_splash(_event=None):
+            if closed["value"]:
+                return
+            closed["value"] = True
+            try:
+                splash.destroy()
+            except Exception:
+                pass
+            self._welcome_splash = None
+            self._show_main_window()
+
+        def animate(step: int = 0):
+            if closed["value"]:
+                return
+            try:
+                if not splash.winfo_exists():
+                    return
+
+                total_steps = 34
+                fade_in_steps = 8
+                fade_out_start = 26
+
+                if step <= fade_in_steps:
+                    alpha = 0.12 + (step / fade_in_steps) * 0.84
+                elif step >= fade_out_start:
+                    alpha = max(0.0, 0.96 - ((step - fade_out_start) / 8) * 0.96)
+                else:
+                    alpha = 0.96
+
+                try:
+                    splash.attributes("-alpha", alpha)
+                except Exception:
+                    pass
+
+                draw_welcome_visual(step)
+                progress.set(min(step / total_steps, 1.0))
+                if step >= total_steps:
+                    close_splash()
+                else:
+                    splash.after(45, lambda: animate(step + 1))
+            except Exception:
+                close_splash()
+
+        splash.bind("<Escape>", close_splash)
+        splash.bind("<Button-1>", close_splash)
+        card.bind("<Button-1>", close_splash)
+        animate()
 
 
     # ═════════════════════════════════════════════════════════════
@@ -508,11 +804,51 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.output_text.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 14))
 
+        self.download_wait_frame = ctk.CTkFrame(
+            self.output_card,
+            fg_color=C_BG_INPUT,
+            corner_radius=8,
+            border_width=0,
+        )
+        self.download_wait_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 14))
+        self.download_wait_frame.grid_columnconfigure(0, weight=1)
+        self.download_wait_frame.grid_rowconfigure(1, weight=1)
+        self.download_wait_frame.grid_remove()
+
+        self.download_wait_title = ctk.CTkLabel(
+            self.download_wait_frame,
+            text="Đang chuẩn bị tải video",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=C_TEXT,
+        )
+        self.download_wait_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(18, 4))
+
+        self.download_wait_canvas = tk.Canvas(
+            self.download_wait_frame,
+            bg=C_BG_INPUT,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.download_wait_canvas.grid(row=1, column=0, sticky="nsew", padx=10, pady=4)
+
+        self.download_wait_status = ctk.CTkLabel(
+            self.download_wait_frame,
+            text="Neon Download Portal",
+            font=ctk.CTkFont(size=12),
+            text_color=C_TEXT_DIM,
+        )
+        self.download_wait_status.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 16))
+
+        self.download_wait_active = False
+        self.download_wait_step = 0
+        self.download_wait_job = None
+
         # Placeholder
         self._show_placeholder()
 
     def _show_placeholder(self):
         """Show placeholder text."""
+        self._hide_download_waiting()
         self.output_text.configure(text_color=C_TEXT_DIM)
         self.output_text.delete("1.0", "end")
         placeholder = (
@@ -522,6 +858,224 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             "Bước 3: ⚡ Bấm \"Get Transcript\"\n"
         )
         self.output_text.insert("1.0", placeholder)
+
+    def _show_download_waiting(self, title: str = "Đang tải video") -> None:
+        """Show a lightweight waiting animation while yt-dlp is downloading."""
+        def _update():
+            self.download_wait_title.configure(text=title)
+            self.download_wait_status.configure(text="Đang kết nối YouTube...")
+            self.download_wait_active = True
+            self.download_wait_step = 0
+            self.download_wait_frame.grid()
+            self.download_wait_frame.tkraise()
+            self._animate_download_waiting()
+        self.after(0, _update)
+
+    def _hide_download_waiting(self) -> None:
+        """Hide and stop the download waiting animation."""
+        def _update():
+            self.download_wait_active = False
+            if self.download_wait_job is not None:
+                try:
+                    self.after_cancel(self.download_wait_job)
+                except Exception:
+                    pass
+                self.download_wait_job = None
+            try:
+                self.download_wait_canvas.delete("all")
+                self.download_wait_frame.grid_remove()
+            except Exception:
+                pass
+        self.after(0, _update)
+
+    def _update_download_waiting_status(self, text: str, progress: float | None = None) -> None:
+        """Update the waiting animation caption from worker threads."""
+        def _update():
+            if not self.download_wait_active:
+                return
+            if progress is None:
+                self.download_wait_status.configure(text=text)
+            else:
+                self.download_wait_status.configure(text=f"{text}  •  {int(progress * 100)}%")
+        self.after(0, _update)
+
+    def _animate_download_waiting(self) -> None:
+        """Animate a neon download portal in the output panel."""
+        if not self.download_wait_active:
+            return
+
+        canvas = self.download_wait_canvas
+        canvas.delete("all")
+
+        width = max(canvas.winfo_width(), 360)
+        height = max(canvas.winfo_height(), 180)
+        center_x = width / 2
+        center_y = height / 2
+        step = self.download_wait_step
+        pulse = (math.sin(step * 0.22) + 1) / 2
+
+        # Moving neon grid background.
+        horizon_y = center_y + 80
+        for index in range(12):
+            y = horizon_y - ((index * 22 + step * 3) % 220)
+            alpha_color = "#17243b" if index % 2 else "#1d3354"
+            canvas.create_line(0, y, width, y, fill=alpha_color, width=1)
+
+        for index in range(-8, 9):
+            base_x = center_x + index * 46
+            offset = math.sin(step * 0.04) * 20
+            canvas.create_line(
+                center_x,
+                center_y + 84,
+                base_x + offset,
+                height,
+                fill="#132033",
+                width=1,
+            )
+
+        # Portal rings.
+        ring_rx = min(width * 0.24, 180)
+        ring_ry = min(height * 0.26, 112)
+        for ring_index, color in enumerate((C_ACCENT, C_PURPLE, C_ACCENT_2)):
+            inset = ring_index * 18
+            start = (step * (6 + ring_index * 3) + ring_index * 62) % 360
+            extent = 82 + pulse * 34
+            canvas.create_oval(
+                center_x - ring_rx + inset,
+                center_y - ring_ry + inset * 0.56,
+                center_x + ring_rx - inset,
+                center_y + ring_ry - inset * 0.56,
+                outline="#0a1320",
+                width=7 - ring_index,
+            )
+            canvas.create_arc(
+                center_x - ring_rx + inset,
+                center_y - ring_ry + inset * 0.56,
+                center_x + ring_rx - inset,
+                center_y + ring_ry - inset * 0.56,
+                start=start,
+                extent=extent,
+                outline=color,
+                width=4 - ring_index,
+                style="arc",
+            )
+            canvas.create_arc(
+                center_x - ring_rx + inset,
+                center_y - ring_ry + inset * 0.56,
+                center_x + ring_rx - inset,
+                center_y + ring_ry - inset * 0.56,
+                start=start + 180,
+                extent=42,
+                outline="#58a6ff",
+                width=2,
+                style="arc",
+            )
+
+        # Falling video frames pulled into the portal.
+        for index in range(7):
+            t = ((step * 0.018) + index / 7) % 1.0
+            side = -1 if index % 2 else 1
+            x = center_x + side * (width * 0.38) * (1 - t) + math.sin(step * 0.09 + index) * 18
+            y = center_y - height * 0.42 + t * height * 0.78
+            scale = 0.42 + t * 0.62
+            card_w = 92 * scale
+            card_h = 48 * scale
+            skew = math.sin(step * 0.1 + index) * 12 * scale
+            color = [C_ACCENT, C_PURPLE, C_ACCENT_2, C_ORANGE][index % 4]
+
+            polygon = [
+                x - card_w / 2 + skew,
+                y - card_h / 2,
+                x + card_w / 2 + skew,
+                y - card_h / 2,
+                x + card_w / 2 - skew,
+                y + card_h / 2,
+                x - card_w / 2 - skew,
+                y + card_h / 2,
+            ]
+            canvas.create_polygon(
+                [coord + 7 if pos % 2 == 0 else coord + 7 for pos, coord in enumerate(polygon)],
+                fill="#07111f",
+                outline="",
+            )
+            canvas.create_polygon(polygon, fill="#142238", outline="#0a1320", width=4)
+            canvas.create_polygon(polygon, fill="#142238", outline=color, width=max(1, int(2 * scale)))
+
+            play_x = x - card_w * 0.18
+            play_y = y
+            play_size = 8 * scale
+            canvas.create_polygon(
+                play_x - play_size / 2,
+                play_y - play_size,
+                play_x - play_size / 2,
+                play_y + play_size,
+                play_x + play_size,
+                play_y,
+                fill=color,
+                outline="",
+            )
+            canvas.create_line(
+                x + card_w * 0.04,
+                y - card_h * 0.12,
+                x + card_w * 0.34,
+                y - card_h * 0.12,
+                fill="#314563",
+                width=max(1, int(2 * scale)),
+            )
+            canvas.create_line(
+                x + card_w * 0.04,
+                y + card_h * 0.12,
+                x + card_w * 0.28,
+                y + card_h * 0.12,
+                fill="#314563",
+                width=max(1, int(2 * scale)),
+            )
+
+        # Particle stream and central download symbol.
+        for index in range(34):
+            t = ((step * 0.035) + index / 34) % 1.0
+            theta = index * 2.28 + step * 0.08
+            radius = (1 - t) * min(width, height) * 0.44
+            x = center_x + math.cos(theta) * radius
+            y = center_y + math.sin(theta) * radius * 0.58
+            dot_size = 1.4 + t * 3.2
+            color = C_ACCENT_2 if index % 3 == 0 else C_ACCENT
+            canvas.create_oval(x - dot_size, y - dot_size, x + dot_size, y + dot_size, fill=color, outline="")
+
+        arrow_y = center_y - 12 + math.sin(step * 0.22) * 5
+        arrow_color = C_ACCENT_2 if pulse > 0.48 else C_ACCENT
+        canvas.create_line(center_x, arrow_y - 38, center_x, arrow_y + 12, fill="#07111f", width=12)
+        canvas.create_line(center_x, arrow_y - 38, center_x, arrow_y + 12, fill=arrow_color, width=6)
+        canvas.create_polygon(
+            center_x - 22,
+            arrow_y + 6,
+            center_x + 22,
+            arrow_y + 6,
+            center_x,
+            arrow_y + 34,
+            fill=arrow_color,
+            outline="#b6f7c4",
+        )
+        canvas.create_line(center_x - 36, arrow_y + 46, center_x + 36, arrow_y + 46, fill=arrow_color, width=5)
+
+        # Top label.
+        canvas.create_text(
+            center_x,
+            max(24, center_y - ring_ry - 20),
+            text="Neon Download Portal",
+            fill=C_TEXT,
+            font=("Segoe UI", 14, "bold"),
+        )
+        canvas.create_text(
+            center_x,
+            max(45, center_y - ring_ry + 2),
+            text="pulling video streams into your library",
+            fill=C_TEXT_DIM,
+            font=("Segoe UI", 10),
+        )
+
+        self.download_wait_step += 1
+        self.download_wait_job = self.after(36, self._animate_download_waiting)
 
     def _build_action_buttons(self, row: int):
         """Action buttons."""
@@ -626,6 +1180,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     ):
         """Update status and optional determinate progress from worker threads."""
         self._set_status(text, color)
+        self._update_download_waiting_status(text, progress)
         if progress is not None:
             self._set_progress(progress)
 
@@ -691,6 +1246,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _set_output(self, text: str):
         """Set output textbox content (thread-safe)."""
         def _update():
+            self._hide_download_waiting()
             self.output_text.configure(text_color=C_TEXT)
             self.output_text.delete("1.0", "end")
             self.output_text.insert("1.0", text)
@@ -1121,8 +1677,10 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         format_type = self.download_format_var.get()
         quality = self.video_quality_var.get()
         cookie_browser = self.cookie_browser_var.get()
+        wait_title = f"Đang tải {format_type} • {quality if format_type != 'Audio (M4A)' else 'audio'}"
         
         try:
+            self._show_download_waiting(wait_title)
             self._set_status("⬇️ Đang khởi tạo tải xuống...", C_ACCENT)
             
             file_path, title = download_video(
@@ -1160,6 +1718,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             self._set_status(f"❌ Lỗi: {str(e)[:80]}", C_RED)
             self.after(0, lambda: messagebox.showerror("Lỗi", str(e)))
         finally:
+            self._hide_download_waiting()
             self._set_processing(False)
 
     def _process_transcript(self, url: str, video_id: str, mode: str, language: str):

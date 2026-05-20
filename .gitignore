@@ -47,6 +47,7 @@ Desktop.ini
 downloads/*.mp3
 downloads/*.wav
 downloads/*.m4a
+downloads/*.mp4
 downloads/*.webm
 downloads/*.opus
 !downloads/.gitkeep
