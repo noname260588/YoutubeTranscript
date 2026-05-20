@@ -30,7 +30,7 @@ pyinstaller --noconsole ^
     --icon icon.ico ^
     --add-data "icon.ico;." ^
     --add-data "author.png;." ^
-    --add-data "tutorial_*.png;." ^
+    --add-data "help.png;." ^
     --add-data "ffmpeg;ffmpeg" ^
     --hidden-import customtkinter ^
     --hidden-import faster_whisper ^

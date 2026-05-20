@@ -677,7 +677,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         close_btn.pack(pady=10)
 
     def _show_tutorial(self):
-        """Show tutorial dialog with image slides."""
+        """Show tutorial dialog with image."""
         tut_win = ctk.CTkToplevel(self)
         tut_win.title("Hướng dẫn sử dụng")
         tut_win.geometry("700x550")
@@ -689,77 +689,37 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         y = self.winfo_y() + (self.winfo_height() - 550) // 2
         tut_win.geometry(f"+{x}+{y}")
         
-        # Load images
+        # Load image
         from PIL import Image
-        images = []
-        for i in range(1, 11):
-            png_path = get_asset_path(f"tutorial_{i}.png")
-            jpg_path = get_asset_path(f"tutorial_{i}.jpg")
+        png_path = get_asset_path("help.png")
+        jpg_path = get_asset_path("help.jpg")
+        
+        valid_path = None
+        if png_path.exists():
+            valid_path = png_path
+        elif jpg_path.exists():
+            valid_path = jpg_path
             
-            valid_path = None
-            if png_path.exists():
-                valid_path = png_path
-            elif jpg_path.exists():
-                valid_path = jpg_path
+        if valid_path:
+            try:
+                img = Image.open(str(valid_path))
+                # Resize while keeping aspect ratio, max 650x450
+                img.thumbnail((650, 450))
+                ctk_img = ctk.CTkImage(light_image=img, size=img.size)
                 
-            if valid_path:
-                try:
-                    img = Image.open(str(valid_path))
-                    # Resize while keeping aspect ratio, max 650x400
-                    img.thumbnail((650, 400))
-                    ctk_img = ctk.CTkImage(light_image=img, size=img.size)
-                    images.append(ctk_img)
-                except Exception as e:
-                    print(f"Failed to load {valid_path}: {e}")
-            else:
-                break # Stop loading if a number is missing
-                
-        if not images:
+                img_label = ctk.CTkLabel(tut_win, text="", image=ctk_img)
+                img_label.pack(pady=(20, 10), expand=True)
+            except Exception as e:
+                print(f"Failed to load {valid_path}: {e}")
+                ctk.CTkLabel(tut_win, text=f"Lỗi tải ảnh: {e}", text_color=C_TEXT).pack(expand=True)
+        else:
             lbl = ctk.CTkLabel(
                 tut_win, 
-                text="Chưa có hình ảnh hướng dẫn.\n\nVui lòng lưu các ảnh hướng dẫn vào thư mục cài đặt\nvới tên 'tutorial_1.png', 'tutorial_2.png', v.v.",
+                text="Chưa có hình ảnh hướng dẫn.\n\nVui lòng lưu ảnh hướng dẫn vào thư mục cài đặt\nvới tên 'help.png' hoặc 'help.jpg'.",
                 font=ctk.CTkFont(size=14),
                 text_color=C_TEXT
             )
             lbl.pack(expand=True)
-            return
-            
-        current_idx = [0] # Use list to modify inside nested functions
-        
-        # UI Elements
-        img_label = ctk.CTkLabel(tut_win, text="")
-        img_label.pack(pady=(20, 10), expand=True)
-        
-        status_label = ctk.CTkLabel(tut_win, text="", text_color=C_TEXT_DIM)
-        status_label.pack(pady=(0, 10))
-        
-        controls_frame = ctk.CTkFrame(tut_win, fg_color="transparent")
-        controls_frame.pack(pady=10)
-        
-        def update_slide():
-            img_label.configure(image=images[current_idx[0]])
-            status_label.configure(text=f"Trang {current_idx[0] + 1} / {len(images)}")
-            
-            prev_btn.configure(state="normal" if current_idx[0] > 0 else "disabled")
-            next_btn.configure(state="normal" if current_idx[0] < len(images) - 1 else "disabled")
-
-        def go_prev():
-            if current_idx[0] > 0:
-                current_idx[0] -= 1
-                update_slide()
-                
-        def go_next():
-            if current_idx[0] < len(images) - 1:
-                current_idx[0] += 1
-                update_slide()
-
-        prev_btn = ctk.CTkButton(controls_frame, text="< Trước", width=80, command=go_prev)
-        prev_btn.pack(side="left", padx=10)
-        
-        next_btn = ctk.CTkButton(controls_frame, text="Tiếp >", width=80, command=go_next)
-        next_btn.pack(side="left", padx=10)
-        
-        update_slide()
 
     def _on_get_transcript(self):
         """Handle Get Transcript button click."""
