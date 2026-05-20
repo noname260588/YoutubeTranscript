@@ -677,20 +677,21 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         close_btn.pack(pady=10)
 
     def _show_tutorial(self):
-        """Show tutorial dialog with image."""
+        """Show tutorial dialog with zoomable image."""
         tut_win = ctk.CTkToplevel(self)
         tut_win.title("Hướng dẫn sử dụng")
-        tut_win.geometry("700x550")
+        tut_win.geometry("880x650")
+        tut_win.minsize(640, 420)
         tut_win.attributes('-topmost', True)
         
         # Center the window
         self.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 700) // 2
-        y = self.winfo_y() + (self.winfo_height() - 550) // 2
+        x = self.winfo_x() + (self.winfo_width() - 880) // 2
+        y = self.winfo_y() + (self.winfo_height() - 650) // 2
         tut_win.geometry(f"+{x}+{y}")
         
         # Load image
-        from PIL import Image
+        from PIL import Image, ImageOps, ImageTk
         png_path = get_asset_path("help.png")
         jpg_path = get_asset_path("help.jpg")
         
@@ -702,13 +703,231 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             
         if valid_path:
             try:
-                img = Image.open(str(valid_path))
-                # Resize while keeping aspect ratio, max 650x450
-                img.thumbnail((650, 450))
-                ctk_img = ctk.CTkImage(light_image=img, size=img.size)
-                
-                img_label = ctk.CTkLabel(tut_win, text="", image=ctk_img)
-                img_label.pack(pady=(20, 10), expand=True)
+                with Image.open(str(valid_path)) as source_img:
+                    original_img = ImageOps.exif_transpose(source_img).copy()
+
+                tut_win.grid_columnconfigure(0, weight=1)
+                tut_win.grid_rowconfigure(1, weight=1)
+
+                toolbar = ctk.CTkFrame(
+                    tut_win,
+                    fg_color=C_BG_CARD,
+                    corner_radius=10,
+                    border_width=1,
+                    border_color=C_BORDER,
+                )
+                toolbar.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 8))
+                toolbar.grid_columnconfigure(0, weight=1)
+
+                title_label = ctk.CTkLabel(
+                    toolbar,
+                    text="Ảnh hướng dẫn",
+                    font=ctk.CTkFont(size=13, weight="bold"),
+                    text_color=C_TEXT,
+                )
+                title_label.grid(row=0, column=0, sticky="w", padx=12, pady=10)
+
+                zoom_label = ctk.CTkLabel(
+                    toolbar,
+                    text="100%",
+                    width=56,
+                    text_color=C_TEXT_DIM,
+                )
+                zoom_label.grid(row=0, column=1, padx=(8, 4), pady=10)
+
+                viewer = ctk.CTkFrame(
+                    tut_win,
+                    fg_color=C_BG_INPUT,
+                    corner_radius=10,
+                    border_width=1,
+                    border_color=C_BORDER,
+                )
+                viewer.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 16))
+                viewer.grid_columnconfigure(0, weight=1)
+                viewer.grid_rowconfigure(0, weight=1)
+
+                canvas = tk.Canvas(
+                    viewer,
+                    bg=C_BG_INPUT,
+                    highlightthickness=0,
+                    bd=0,
+                    xscrollincrement=20,
+                    yscrollincrement=20,
+                )
+                v_scroll = ctk.CTkScrollbar(viewer, orientation="vertical", command=canvas.yview)
+                h_scroll = ctk.CTkScrollbar(viewer, orientation="horizontal", command=canvas.xview)
+                canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
+
+                canvas.grid(row=0, column=0, sticky="nsew", padx=(8, 0), pady=(8, 0))
+                v_scroll.grid(row=0, column=1, sticky="ns", padx=(4, 8), pady=(8, 0))
+                h_scroll.grid(row=1, column=0, sticky="ew", padx=(8, 0), pady=(4, 8))
+
+                state = {
+                    "scale": 1.0,
+                    "photo": None,
+                    "user_zoomed": False,
+                    "dragging": False,
+                }
+                tut_win._tutorial_image_state = state
+
+                resample = (
+                    Image.Resampling.LANCZOS
+                    if hasattr(Image, "Resampling")
+                    else Image.LANCZOS
+                )
+
+                def render_image():
+                    scale = state["scale"]
+                    width = max(1, int(original_img.width * scale))
+                    height = max(1, int(original_img.height * scale))
+                    display_img = original_img.resize((width, height), resample)
+
+                    state["photo"] = ImageTk.PhotoImage(display_img)
+                    canvas.delete("tutorial_image")
+
+                    canvas_width = max(canvas.winfo_width(), 1)
+                    canvas_height = max(canvas.winfo_height(), 1)
+                    image_x = max((canvas_width - width) // 2, 0)
+                    image_y = max((canvas_height - height) // 2, 0)
+
+                    canvas.create_image(
+                        image_x,
+                        image_y,
+                        anchor="nw",
+                        image=state["photo"],
+                        tags="tutorial_image",
+                    )
+                    canvas.configure(
+                        scrollregion=(
+                            0,
+                            0,
+                            max(width + image_x, canvas_width),
+                            max(height + image_y, canvas_height),
+                        )
+                    )
+                    zoom_label.configure(text=f"{int(scale * 100)}%")
+
+                def get_fit_scale():
+                    canvas.update_idletasks()
+                    canvas_width = max(canvas.winfo_width() - 16, 1)
+                    canvas_height = max(canvas.winfo_height() - 16, 1)
+                    return max(
+                        0.1,
+                        min(
+                            canvas_width / original_img.width,
+                            canvas_height / original_img.height,
+                            1.0,
+                        ),
+                    )
+
+                def set_zoom(scale: float, user_zoomed: bool = True):
+                    state["scale"] = max(0.1, min(scale, 5.0))
+                    state["user_zoomed"] = user_zoomed
+                    render_image()
+
+                def zoom_in():
+                    set_zoom(state["scale"] * 1.25)
+
+                def zoom_out():
+                    set_zoom(state["scale"] / 1.25)
+
+                def zoom_actual():
+                    set_zoom(1.0)
+
+                def zoom_fit():
+                    set_zoom(get_fit_scale(), user_zoomed=False)
+
+                def on_mousewheel(event):
+                    delta = getattr(event, "delta", 0)
+                    button = getattr(event, "num", None)
+
+                    if button == 4:
+                        delta = 120
+                    elif button == 5:
+                        delta = -120
+
+                    if delta > 0:
+                        zoom_in()
+                    elif delta < 0:
+                        zoom_out()
+                    return "break"
+
+                def start_pan(event):
+                    state["dragging"] = True
+                    canvas.scan_mark(event.x, event.y)
+                    canvas.configure(cursor="fleur")
+                    return "break"
+
+                def drag_pan(event):
+                    if state["dragging"]:
+                        canvas.scan_dragto(event.x, event.y, gain=1)
+                    return "break"
+
+                def end_pan(_event):
+                    state["dragging"] = False
+                    canvas.configure(cursor="")
+                    return "break"
+
+                def on_resize(_event):
+                    if not state["user_zoomed"]:
+                        state["scale"] = get_fit_scale()
+                    render_image()
+
+                zoom_out_btn = ctk.CTkButton(
+                    toolbar,
+                    text="-",
+                    width=36,
+                    command=zoom_out,
+                )
+                zoom_out_btn.grid(row=0, column=2, padx=4, pady=10)
+
+                zoom_in_btn = ctk.CTkButton(
+                    toolbar,
+                    text="+",
+                    width=36,
+                    command=zoom_in,
+                )
+                zoom_in_btn.grid(row=0, column=3, padx=4, pady=10)
+
+                actual_btn = ctk.CTkButton(
+                    toolbar,
+                    text="100%",
+                    width=64,
+                    command=zoom_actual,
+                )
+                actual_btn.grid(row=0, column=4, padx=4, pady=10)
+
+                fit_btn = ctk.CTkButton(
+                    toolbar,
+                    text="Fit",
+                    width=64,
+                    command=zoom_fit,
+                )
+                fit_btn.grid(row=0, column=5, padx=(4, 12), pady=10)
+
+                def bind_mousewheel(_event=None):
+                    canvas.focus_set()
+                    canvas.bind_all("<MouseWheel>", on_mousewheel)
+                    canvas.bind_all("<Button-4>", on_mousewheel)
+                    canvas.bind_all("<Button-5>", on_mousewheel)
+
+                def unbind_mousewheel(_event=None):
+                    canvas.unbind_all("<MouseWheel>")
+                    canvas.unbind_all("<Button-4>")
+                    canvas.unbind_all("<Button-5>")
+
+                def close_tutorial():
+                    unbind_mousewheel()
+                    tut_win.destroy()
+
+                canvas.bind("<Enter>", bind_mousewheel)
+                canvas.bind("<Leave>", unbind_mousewheel)
+                canvas.bind("<ButtonPress-2>", start_pan)
+                canvas.bind("<B2-Motion>", drag_pan)
+                canvas.bind("<ButtonRelease-2>", end_pan)
+                canvas.bind("<Configure>", on_resize)
+                tut_win.protocol("WM_DELETE_WINDOW", close_tutorial)
+                tut_win.after(100, zoom_fit)
             except Exception as e:
                 print(f"Failed to load {valid_path}: {e}")
                 ctk.CTkLabel(tut_win, text=f"Lỗi tải ảnh: {e}", text_color=C_TEXT).pack(expand=True)
