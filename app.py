@@ -127,12 +127,23 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         header_frame.grid(row=row, column=0, sticky="ew", pady=(0, 8))
 
-        self.sheep_label = ctk.CTkLabel(
-            header_frame,
-            text="🐑",
-            font=ctk.CTkFont(size=28),
-        )
-        self.sheep_label.pack(side="left", padx=(0, 6))
+        # Small corner app icon
+        try:
+            from PIL import Image
+            icon_path = get_base_dir() / "icon.ico"
+            if icon_path.exists():
+                sheep_img = ctk.CTkImage(
+                    light_image=Image.open(str(icon_path)),
+                    size=(28, 28)
+                )
+                self.icon_label = ctk.CTkLabel(
+                    header_frame,
+                    text="",
+                    image=sheep_img
+                )
+                self.icon_label.pack(side="left", padx=(0, 10))
+        except Exception:
+            pass
 
         self.title_label = ctk.CTkLabel(
             header_frame,
