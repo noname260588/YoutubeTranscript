@@ -7,11 +7,14 @@ Built with CustomTkinter for a modern dark UI.
 import os
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from pathlib import Path
 
 import customtkinter as ctk
+import keyboard
+import pyperclip
 
 from utils import (
     extract_video_id,
@@ -99,6 +102,12 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # ─── Set Appearance ──────────────────────────────────────
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
+
+        # ─── Global Hotkey Setup ──────────────────────────────────
+        try:
+            keyboard.add_hotkey('ctrl+shift+c', self._on_global_hotkey)
+        except Exception as e:
+            print(f"Could not register global hotkey: {e}")
 
         # ─── Build UI ────────────────────────────────────────────
         self._build_ui()
@@ -188,7 +197,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         self.url_entry = ctk.CTkEntry(
             self.input_card,
-            placeholder_text="Paste YouTube URL here... (e.g. https://www.youtube.com/watch?v=...)",
+            placeholder_text="Paste YouTube URL here... (Hoặc bôi đen link và bấm Ctrl + Shift + C)",
             font=ctk.CTkFont(size=13),
             height=42,
             fg_color=C_BG_INPUT,
@@ -196,8 +205,16 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             text_color=C_TEXT,
             corner_radius=10,
         )
-        self.url_entry.grid(row=1, column=0, sticky="ew", padx=(16, 8), pady=(0, 14))
+        self.url_entry.grid(row=1, column=0, sticky="ew", padx=(16, 8), pady=(0, 4))
         self.url_entry.bind("<Return>", lambda e: self._on_get_transcript())
+        
+        hint_label = ctk.CTkLabel(
+            self.input_card,
+            text="💡 Mẹo: Bôi đen một link YouTube bất kỳ đâu (trên trình duyệt, tin nhắn...) và nhấn Ctrl + Shift + C để app tự động copy và xử lý!",
+            font=ctk.CTkFont(size=11, slant="italic"),
+            text_color=C_TEXT_DIM,
+        )
+        hint_label.grid(row=2, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 10))
 
         self.get_btn = ctk.CTkButton(
             self.input_card,
@@ -210,7 +227,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             corner_radius=10,
             command=self._on_get_transcript,
         )
-        self.get_btn.grid(row=1, column=1, sticky="e", padx=(0, 8), pady=(0, 14))
+        self.get_btn.grid(row=1, column=1, sticky="e", padx=(0, 8), pady=(0, 4))
 
         self.download_video_btn = ctk.CTkButton(
             self.input_card,
@@ -223,7 +240,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             corner_radius=10,
             command=self._on_download_video,
         )
-        self.download_video_btn.grid(row=1, column=2, sticky="e", padx=(0, 16), pady=(0, 14))
+        self.download_video_btn.grid(row=1, column=2, sticky="e", padx=(0, 16), pady=(0, 4))
 
     def _build_options_section(self, row: int):
         """Options: Language, Mode, Whisper settings, Show timestamps toggle."""
@@ -547,6 +564,46 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _on_toggle_timestamps(self):
         """Handle timestamp toggle switch."""
         self._refresh_output()
+
+    def _on_global_hotkey(self):
+        """Handle Ctrl+Shift+C global hotkey to copy and fill URL."""
+        if self.is_processing:
+            return
+            
+        # 1. Send Ctrl+C to copy selected text
+        keyboard.send('ctrl+c')
+        time.sleep(0.1)  # Wait for clipboard to update
+        
+        # 2. Get text from clipboard
+        try:
+            url = pyperclip.paste().strip()
+        except Exception:
+            return
+            
+        if not url:
+            return
+            
+        # 3. Only process if it looks like a YouTube URL
+        if "youtube.com" in url or "youtu.be" in url:
+            # We must use self.after to run UI updates in the main thread
+            self.after(0, lambda: self._fill_and_process(url))
+            
+    def _fill_and_process(self, url: str):
+        """Fill URL entry, bring app to front, and start processing."""
+        # Bring window to front
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+        self.attributes('-topmost', True)
+        self.after(500, lambda: self.attributes('-topmost', False))
+        
+        # Fill entry
+        self.url_entry.delete(0, "end")
+        self.url_entry.insert(0, url)
+        
+        # Determine whether to download or get transcript based on mode/format?
+        # Defaulting to getting transcript like a normal paste+enter
+        self._on_get_transcript()
 
     def _on_get_transcript(self):
         """Handle Get Transcript button click."""
