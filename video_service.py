@@ -14,14 +14,18 @@ class VideoDownloadError(Exception):
 def download_video(
     video_url: str,
     output_dir: str = "downloads",
+    format_type: str = "Video (MP4)",
+    quality: str = "Best",
     progress_callback=None
 ) -> tuple[str, str]:
     """
-    Download the best video and audio streams and merge them into an MP4 file.
+    Download video or audio from YouTube.
 
     Args:
         video_url: Full YouTube video URL.
-        output_dir: Directory to save the video file (relative to base dir).
+        output_dir: Directory to save the file (relative to base dir).
+        format_type: "Video (MP4)" or "Audio (MP3)".
+        quality: "Best", "1080p", "720p", "480p".
         progress_callback: Optional callback function for progress updates.
                           Called with (status_message: str).
 
@@ -67,16 +71,42 @@ def download_video(
 
     ffmpeg_dir = get_ffmpeg_dir()
 
-    # We want bestvideo + bestaudio, merged into mp4
-    ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'outtmpl': str(out_path / '%(title)s.%(ext)s'),
-        'merge_output_format': 'mp4',
-        'progress_hooks': [progress_hook],
-        'quiet': True,
-        'no_warnings': True,
-        'noprogress': False,
-    }
+    is_audio = (format_type == "Audio (MP3)")
+    
+    # Configure format string based on user choice
+    if is_audio:
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': str(out_path / '%(title)s.%(ext)s'),
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'progress_hooks': [progress_hook],
+            'quiet': True,
+            'no_warnings': True,
+            'noprogress': False,
+        }
+    else:
+        # Video quality map
+        quality_map = {
+            "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+            "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+            "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
+            "Best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+        }
+        fmt_str = quality_map.get(quality, quality_map["Best"])
+        
+        ydl_opts = {
+            'format': fmt_str,
+            'outtmpl': str(out_path / '%(title)s.%(ext)s'),
+            'merge_output_format': 'mp4',
+            'progress_hooks': [progress_hook],
+            'quiet': True,
+            'no_warnings': True,
+            'noprogress': False,
+        }
 
     if ffmpeg_dir:
         ydl_opts['ffmpeg_location'] = ffmpeg_dir
@@ -86,20 +116,21 @@ def download_video(
             info = ydl.extract_info(video_url, download=True)
             video_title[0] = info.get('title', 'Unknown')
             
-            # Find the merged file
-            title = sanitize_filename(info.get('title', 'video'))
-            expected_mp4 = out_path / f"{title}.mp4"
+            # Find the merged/downloaded file
+            title = sanitize_filename(info.get('title', 'download'))
+            ext = "mp3" if is_audio else "mp4"
+            expected_file = out_path / f"{title}.{ext}"
             
-            if expected_mp4.exists():
-                return str(expected_mp4), video_title[0]
+            if expected_file.exists():
+                return str(expected_file), video_title[0]
                 
-            # If title sanitization in yt-dlp is slightly different, check for latest mp4
-            mp4_files = list(out_path.glob("*.mp4"))
-            if mp4_files:
-                latest = max(mp4_files, key=lambda f: f.stat().st_mtime)
+            # If title sanitization in yt-dlp is slightly different, check for latest file
+            files = list(out_path.glob(f"*.{ext}"))
+            if files:
+                latest = max(files, key=lambda f: f.stat().st_mtime)
                 return str(latest), video_title[0]
 
-            raise VideoDownloadError("Tải video thành công nhưng không tìm thấy file MP4.")
+            raise VideoDownloadError(f"Tải thành công nhưng không tìm thấy file {ext.upper()}.")
 
     except yt_dlp.utils.DownloadError as e:
         raise VideoDownloadError(f"Không thể tải video.\nChi tiết: {str(e)}")

@@ -214,7 +214,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         self.download_video_btn = ctk.CTkButton(
             self.input_card,
-            text="⬇️ Download Video",
+            text="⬇️ Download",
             font=ctk.CTkFont(size=13, weight="bold"),
             height=42,
             width=150,
@@ -325,6 +325,50 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             command=self._on_toggle_timestamps,
         )
         self.timestamps_switch.grid(row=1, column=4, padx=16, pady=(0, 12), sticky="w")
+
+        # ── Row 2-3: Download Format
+        self._make_option_label(self.options_card, "📥 Download Format", 2, 0)
+        self.download_format_var = ctk.StringVar(value="Video (MP4)")
+        self.download_format_dropdown = ctk.CTkOptionMenu(
+            self.options_card,
+            variable=self.download_format_var,
+            values=["Video (MP4)", "Audio (MP3)"],
+            font=ctk.CTkFont(size=12),
+            fg_color=C_BG_INPUT,
+            button_color=C_BORDER,
+            button_hover_color=C_ACCENT,
+            dropdown_fg_color=C_BG_CARD,
+            dropdown_hover_color=C_ACCENT,
+            corner_radius=8,
+            width=130,
+            command=self._on_format_change
+        )
+        self.download_format_dropdown.grid(row=3, column=0, padx=16, pady=(0, 16), sticky="w")
+
+        # ── Row 2-3: Video Quality
+        self._make_option_label(self.options_card, "🎞️ Video Quality", 2, 1)
+        self.video_quality_var = ctk.StringVar(value="Best")
+        self.video_quality_dropdown = ctk.CTkOptionMenu(
+            self.options_card,
+            variable=self.video_quality_var,
+            values=["Best", "1080p", "720p", "480p"],
+            font=ctk.CTkFont(size=12),
+            fg_color=C_BG_INPUT,
+            button_color=C_BORDER,
+            button_hover_color=C_ACCENT,
+            dropdown_fg_color=C_BG_CARD,
+            dropdown_hover_color=C_ACCENT,
+            corner_radius=8,
+            width=180,
+        )
+        self.video_quality_dropdown.grid(row=3, column=1, padx=16, pady=(0, 16), sticky="w")
+
+    def _on_format_change(self, choice):
+        """Disable quality dropdown if Audio (MP3) is selected."""
+        if choice == "Audio (MP3)":
+            self.video_quality_dropdown.configure(state="disabled")
+        else:
+            self.video_quality_dropdown.configure(state="normal")
 
     def _make_option_label(self, parent, text: str, row: int, col: int):
         label = ctk.CTkLabel(
@@ -476,7 +520,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 self.progress_bar.start()
             else:
                 self.get_btn.configure(state="normal", text="⚡ Get Transcript")
-                self.download_video_btn.configure(state="normal", text="⬇️ Download Video")
+                self.download_video_btn.configure(state="normal", text="⬇️ Download")
                 self.progress_bar.stop()
                 self.progress_bar.pack_forget()
         self.after(0, _update)
@@ -561,21 +605,26 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         """Process video downloading (background thread)."""
         self._set_processing(True, button="video")
         
+        format_type = self.download_format_var.get()
+        quality = self.video_quality_var.get()
+        
         try:
-            self._set_status("⬇️ Đang khởi tạo tải video...", C_ACCENT)
+            self._set_status("⬇️ Đang khởi tạo tải xuống...", C_ACCENT)
             
-            video_path, title = download_video(
+            file_path, title = download_video(
                 url,
+                format_type=format_type,
+                quality=quality,
                 progress_callback=lambda msg: self._set_status(f"⬇️ {msg}", C_ACCENT)
             )
             
-            self._set_status(f"🎉 Đã tải xong video: {title}", C_ACCENT_2)
+            self._set_status(f"🎉 Đã tải xong: {title}", C_ACCENT_2)
             
             # Prompt user to open the folder
             def ask_open():
-                if messagebox.askyesno("Tải hoàn tất", f"Đã tải thành công:\n{title}\n\nBạn có muốn mở thư mục chứa video không?"):
+                if messagebox.askyesno("Tải hoàn tất", f"Đã tải thành công:\n{title}\n\nBạn có muốn mở thư mục chứa file không?"):
                     try:
-                        folder = str(Path(video_path).parent)
+                        folder = str(Path(file_path).parent)
                         os.startfile(folder)
                     except Exception as e:
                         print(f"Cannot open folder: {e}")
@@ -583,8 +632,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             self.after(500, ask_open)
             
         except VideoDownloadError as e:
-            self._set_status("❌ Lỗi tải video", C_RED)
-            self.after(0, lambda: messagebox.showerror("Lỗi Tải Video", str(e)))
+            self._set_status("❌ Lỗi tải file", C_RED)
+            self.after(0, lambda: messagebox.showerror("Lỗi Tải Xuống", str(e)))
         except Exception as e:
             self._set_status(f"❌ Lỗi: {str(e)[:80]}", C_RED)
             self.after(0, lambda: messagebox.showerror("Lỗi", str(e)))
