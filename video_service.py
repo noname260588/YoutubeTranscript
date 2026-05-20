@@ -24,7 +24,7 @@ def download_video(
     Args:
         video_url: Full YouTube video URL.
         output_dir: Directory to save the file (relative to base dir).
-        format_type: "Video (MP4)" or "Audio (MP3)".
+        format_type: "Video (MP4)" or "Audio (M4A)".
         quality: "Best", "1080p", "720p", "480p".
         progress_callback: Optional callback function for progress updates.
                           Called with (status_message: str).
@@ -71,17 +71,16 @@ def download_video(
 
     ffmpeg_dir = get_ffmpeg_dir()
 
-    is_audio = (format_type == "Audio (MP3)")
+    is_audio = (format_type == "Audio (M4A)")
     
     # Configure format string based on user choice
     if is_audio:
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
             'outtmpl': str(out_path / '%(title)s.%(ext)s'),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
+                'preferredcodec': 'm4a',
             }],
             'progress_hooks': [progress_hook],
             'quiet': True,
@@ -118,7 +117,7 @@ def download_video(
             
             # Find the merged/downloaded file
             title = sanitize_filename(info.get('title', 'download'))
-            ext = "mp3" if is_audio else "mp4"
+            ext = "m4a" if is_audio else "mp4"
             expected_file = out_path / f"{title}.{ext}"
             
             if expected_file.exists():

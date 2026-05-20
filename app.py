@@ -332,7 +332,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.download_format_dropdown = ctk.CTkOptionMenu(
             self.options_card,
             variable=self.download_format_var,
-            values=["Video (MP4)", "Audio (MP3)"],
+            values=["Video (MP4)", "Audio (M4A)"],
             font=ctk.CTkFont(size=12),
             fg_color=C_BG_INPUT,
             button_color=C_BORDER,
@@ -364,8 +364,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.video_quality_dropdown.grid(row=3, column=1, padx=16, pady=(0, 16), sticky="w")
 
     def _on_format_change(self, choice):
-        """Disable quality dropdown if Audio (MP3) is selected."""
-        if choice == "Audio (MP3)":
+        """Disable quality dropdown if Audio is selected."""
+        if choice == "Audio (M4A)":
             self.video_quality_dropdown.configure(state="disabled")
         else:
             self.video_quality_dropdown.configure(state="normal")
