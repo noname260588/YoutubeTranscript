@@ -619,13 +619,13 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         """Show About dialog with author info and image."""
         about_win = ctk.CTkToplevel(self)
         about_win.title("About")
-        about_win.geometry("400x450")
+        about_win.geometry("400x550")
         about_win.attributes('-topmost', True)
         
         # Center the about window relative to main window
         self.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() - 400) // 2
-        y = self.winfo_y() + (self.winfo_height() - 450) // 2
+        y = self.winfo_y() + (self.winfo_height() - 550) // 2
         about_win.geometry(f"+{x}+{y}")
         
         # Try to load author.png or author.jpg
