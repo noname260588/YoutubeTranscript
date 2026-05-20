@@ -15,9 +15,10 @@
 |-----------|-------|
 | 🎯 **YouTube Transcript** | Lấy transcript/caption có sẵn từ YouTube |
 | 🎤 **Speech-to-Text Offline** | Tự động tải audio + chuyển thành text bằng faster-whisper |
-| ⬇️ **Download Video** | Tải video chất lượng cao (best video+audio) từ YouTube |
+| ⬇️ **Download Video/Audio** | Tải video MP4 hoặc audio M4A từ YouTube |
 | ⏱️ **Timestamps Toggle** | Bật/tắt hiển thị timestamp trong transcript |
 | 📋 **Copy to Clipboard** | Copy transcript chỉ với 1 click |
+| ⌨️ **Global Hotkey** | Bôi đen link YouTube và nhấn `Ctrl + Shift + C` để đưa link vào app |
 | 💾 **Export TXT** | Xuất plain text với timestamp |
 | 📝 **Export Markdown** | Xuất Obsidian-friendly markdown với metadata |
 | 🎬 **Export SRT** | Xuất phụ đề chuẩn SRT |
@@ -62,10 +63,11 @@ Paste YouTube URL → Bấm "Get Transcript" → Copy hoặc Export file
 |----------|---------|
 | [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) | Desktop UI framework (dark theme) |
 | [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api) | Lấy transcript có sẵn từ YouTube |
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Download audio từ YouTube |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Download video/audio từ YouTube |
 | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Speech-to-text offline (Whisper CTranslate2) |
 | [pyperclip](https://github.com/asweigart/pyperclip) | Copy text vào clipboard |
-| [FFmpeg](https://ffmpeg.org/) | Convert audio sang MP3 |
+| [keyboard](https://github.com/boppreh/keyboard) | Global hotkey `Ctrl + Shift + C` |
+| [FFmpeg](https://ffmpeg.org/) | Convert audio và merge video/audio |
 
 ---
 
@@ -76,6 +78,7 @@ YoutubeTranscript/
 ├── app.py                   # Main desktop UI (CustomTkinter)
 ├── transcript_service.py    # Lấy transcript từ YouTube API
 ├── audio_service.py         # Download audio bằng yt-dlp
+├── video_service.py         # Download video MP4 hoặc audio M4A bằng yt-dlp
 ├── whisper_service.py       # Speech-to-text bằng faster-whisper
 ├── export_service.py        # Xuất file TXT, Markdown, SRT
 ├── utils.py                 # Utility: parse URL, format timestamp, sanitize filename
@@ -83,6 +86,9 @@ YoutubeTranscript/
 ├── build.bat                # Build portable EXE bằng PyInstaller
 ├── README.md                # Documentation
 ├── .gitignore               # Git ignore rules
+├── icon.ico                 # App icon
+├── author.png               # Ảnh About dialog
+├── help.png                 # Ảnh hướng dẫn sử dụng
 ├── ffmpeg/                  # FFmpeg executable (tự đặt vào)
 │   └── ffmpeg.exe
 ├── models/                  # Whisper models (auto-download lần đầu)
@@ -101,6 +107,13 @@ YoutubeTranscript/
 | **Auto** | Thử lấy transcript trước, nếu không có thì fallback sang STT |
 | **Transcript Only** | Chỉ lấy transcript có sẵn từ YouTube |
 | **Speech-to-Text Only** | Bỏ qua transcript, luôn tải audio + chạy Whisper |
+
+### Download options
+
+| Tuỳ chọn | Giá trị |
+|---------|---------|
+| **Format** | `Video (MP4)`, `Audio (M4A)` |
+| **Video Quality** | `Best`, `1080p`, `720p`, `480p` |
 
 ### Whisper Models
 
@@ -166,9 +179,9 @@ Tạo portable `.exe` cho Windows:
 build.bat
 ```
 
-Output: `dist/YouTubeKnowledgeClipper/`
+Output: `dist/YouTubeKnowledgeClipper.exe`
 
-> ⚠️ **Lưu ý**: Sau khi build, cần copy thêm thư mục `ffmpeg/`, `models/`, `downloads/`, `exports/` vào thư mục output.
+> ⚠️ **Lưu ý**: Bản build hiện dùng PyInstaller `--onefile`. Sau khi build, đặt các thư mục runtime `ffmpeg/`, `models/`, `downloads/`, `exports/` cùng cấp với file `dist/YouTubeKnowledgeClipper.exe` nếu cần chạy STT/download/export ở bản portable.
 
 ---
 
@@ -178,6 +191,7 @@ Output: `dist/YouTubeKnowledgeClipper/`
 - **Whisper Model**: Lần chạy đầu tiên ở mode STT sẽ tự động download model từ Hugging Face (~460MB cho `small`). Cần có internet.
 - **Transcript mode**: Phụ thuộc vào việc video có caption/phụ đề hay không. Nhiều video không có sẵn transcript.
 - **Hiệu suất STT**: Chạy trên CPU nên video dài có thể mất vài phút. Model `tiny` nhanh nhất nếu cần tốc độ.
+- **Global hotkey**: `Ctrl + Shift + C` dùng thư viện `keyboard`; trên một số máy Windows có thể cần quyền phù hợp để bắt phím toàn cục.
 
 ---
 
