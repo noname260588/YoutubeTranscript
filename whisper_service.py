@@ -4,6 +4,7 @@ Uses faster-whisper for offline audio transcription.
 """
 
 from pathlib import Path
+from utils import get_base_dir
 
 
 class WhisperTranscriptionError(Exception):
@@ -14,6 +15,9 @@ class WhisperTranscriptionError(Exception):
 # Cache loaded models to avoid reloading
 _model_cache: dict = {}
 
+# Local models directory (next to app.py)
+MODELS_DIR = get_base_dir() / "models"
+
 
 def transcribe_audio(
     audio_path: str,
@@ -23,6 +27,9 @@ def transcribe_audio(
 ) -> list[dict]:
     """
     Transcribe audio file using faster-whisper.
+
+    Models are stored in the local 'models/' directory next to app.py,
+    making the app fully portable.
 
     Args:
         audio_path: Path to the audio file (MP3, WAV, etc.).
@@ -59,6 +66,9 @@ def transcribe_audio(
     if model_size not in valid_models:
         model_size = 'small'
 
+    # Ensure models directory exists
+    MODELS_DIR.mkdir(exist_ok=True)
+
     # Load or get cached model
     if progress_callback:
         progress_callback(f"Đang tải Whisper model '{model_size}'... (lần đầu có thể mất vài phút)")
@@ -68,7 +78,8 @@ def transcribe_audio(
             model = WhisperModel(
                 model_size,
                 device="cpu",
-                compute_type="int8"
+                compute_type="int8",
+                download_root=str(MODELS_DIR)
             )
             _model_cache[model_size] = model
         else:
