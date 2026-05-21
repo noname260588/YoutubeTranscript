@@ -31,7 +31,8 @@ jobs:
       - name: Build macOS Executable
         run: |
           # Use colon (:) instead of semicolon (;) for --add-data on macOS/Linux
-          pyinstaller --noconsole --noconfirm --onefile \
+          # Use --windowed to create a proper macOS .app bundle
+          pyinstaller --windowed --noconfirm \
             --name YouTubeKnowledgeClipperMac \
             --add-data "author.png:." \
             --add-data "help.png:." \
@@ -45,8 +46,13 @@ jobs:
             --hidden-import PIL.ImageTk \
             app.py
 
+      - name: Zip App Bundle
+        run: |
+          cd dist
+          zip -ry YouTubeKnowledgeClipper-macOS.zip YouTubeKnowledgeClipperMac.app
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: YouTubeKnowledgeClipper-macOS
-          path: dist/YouTubeKnowledgeClipperMac
+          path: dist/YouTubeKnowledgeClipper-macOS.zip

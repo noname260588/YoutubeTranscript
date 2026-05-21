@@ -15,7 +15,12 @@ from tkinter import filedialog, messagebox
 from pathlib import Path
 
 import customtkinter as ctk
-import keyboard
+try:
+    import keyboard
+    HAS_KEYBOARD = True
+except Exception as e:
+    print(f"Keyboard module disabled (likely requires root on Mac/Linux): {e}")
+    HAS_KEYBOARD = False
 import pyperclip
 
 from utils import (
@@ -130,11 +135,12 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        # ─── Global Hotkey Setup ──────────────────────────────────
-        try:
-            keyboard.add_hotkey('ctrl+shift+c', self._on_global_hotkey)
-        except Exception as e:
-            print(f"Could not register global hotkey: {e}")
+        # Register global hotkey (Ctrl + Shift + C) to grab URL from clipboard
+        if HAS_KEYBOARD:
+            try:
+                keyboard.add_hotkey('ctrl+shift+c', self._on_global_hotkey)
+            except Exception as e:
+                print(f"Could not register global hotkey: {e}")
 
         # ─── Build UI ────────────────────────────────────────────
         self._build_ui()
@@ -1599,8 +1605,11 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         if self.is_processing:
             return
             
-        # 1. Send Ctrl+C to copy selected text
-        keyboard.send('ctrl+c')
+        if HAS_KEYBOARD:
+            try:
+                keyboard.send('ctrl+c')
+            except Exception:
+                pass
         time.sleep(0.1)  # Wait for clipboard to update
         
         # 2. Get text from clipboard
