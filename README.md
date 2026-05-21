@@ -290,10 +290,13 @@ https://m.youtube.com/watch?v=VIDEO_ID
 - [x] Split transcript by paragraph (rule-based Markdown clean mode)
 - [x] Save directly to Obsidian vault
 - [x] Remember last export folder
+- [x] Global Hotkey (`Ctrl + Shift + C`) to auto-fill URL
+- [x] Offline Prompt Template Generator (Key ideas, Quotes, Summaries)
+- [x] Extract YouTube metadata (Chapters, Description, Tags)
+- [x] In-app Tutorial & About dialog with static image support
 - [ ] Dark/Light theme toggle
 - [ ] Drag & drop local audio file
-- [ ] Auto summarize with AI
-- [ ] Extract key ideas & quotes
+- [ ] Auto summarize with local AI (without copy-pasting)
 
 ---
 

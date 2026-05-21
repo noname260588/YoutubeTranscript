@@ -15,6 +15,9 @@
 - Offline Prompt Template Generator with nine built-in prompt types.
 - Prompt rendering service backed by `prompt_templates.json`.
 - Sample exported Markdown note under `samples/`.
+- In-app **About** dialog with author image and app information.
+- In-app **Tutorial** viewer that loads a static `help.png` or `help.jpg` from the current directory.
+- Global Hotkey (`Ctrl + Shift + C`) to automatically bring the app to the front and paste the copied YouTube URL.
 
 ### Changed
 - Markdown export now uses v1.0 frontmatter fields: `type`, `title`, `source`, `language`, `created`, `mode`, and `tags`.
