@@ -72,3 +72,4 @@ ffmpeg/*.dll
 *.tmp
 *.temp
 *.bak
+settings.json

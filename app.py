@@ -5,6 +5,7 @@ Built with CustomTkinter for a modern dark UI.
 """
 
 import os
+import re
 import sys
 import threading
 import time
@@ -36,18 +37,22 @@ from audio_service import (
 from video_service import download_video, VideoDownloadCancelledError, VideoDownloadError
 from whisper_service import transcribe_audio, WhisperTranscriptionError
 from export_service import (
+    MARKDOWN_MODES,
     export_txt,
     export_markdown,
     export_srt,
     format_transcript_text,
 )
+from settings_service import load_settings, save_settings
 
 
 # ─── App Constants ───────────────────────────────────────────────
 APP_TITLE = "YouTube Knowledge Clipper"
 APP_VERSION = "1.0.0"
-WINDOW_WIDTH = 960
+WINDOW_WIDTH = 980
 WINDOW_HEIGHT = 720
+OUTPUT_DEFAULT_HEIGHT = 180
+OUTPUT_EXPANDED_HEIGHT = 280
 
 LANGUAGES = ["Auto", "vi", "en", "ja", "zh"]
 MODES = ["Auto", "Transcript Only", "Speech-to-Text Only"]
@@ -58,6 +63,7 @@ COOKIE_BROWSERS = ["Auto", "None", "Edge", "Chrome", "Firefox", "Brave", "Vivald
 C_BG_DARK = "#0d1117"
 C_BG_CARD = "#161b22"
 C_BG_INPUT = "#1c2333"
+C_BG_ELEVATED = "#20283a"
 C_BORDER = "#30363d"
 C_ACCENT = "#58a6ff"
 C_ACCENT_HOVER = "#79c0ff"
@@ -82,7 +88,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # ─── Window Setup ────────────────────────────────────────
         self.title(f"{APP_TITLE} v{APP_VERSION}")
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-        self.minsize(800, 600)
+        self.minsize(860, 620)
         self.configure(fg_color=C_BG_DARK)
 
         # Center window
@@ -104,6 +110,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.current_metadata: dict = {}
         self.is_processing = False
         self.cancel_event = threading.Event()
+        self.settings = load_settings()
 
         # ─── Ensure Directories ──────────────────────────────────
         ensure_dirs()
@@ -120,6 +127,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         # ─── Build UI ────────────────────────────────────────────
         self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Hide the main window until the welcome loading animation completes.
         self.withdraw()
@@ -424,22 +432,22 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _build_ui(self):
         """Build the complete UI layout."""
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        self.main_frame.pack(fill="both", expand=True, padx=14, pady=8)
 
         self.main_frame.columnconfigure(0, weight=1)
-        self.main_frame.rowconfigure(3, weight=1)
+        self.main_frame.rowconfigure(3, weight=4, minsize=OUTPUT_DEFAULT_HEIGHT)
 
         self._build_header(row=0)
         self._build_input_section(row=1)
         self._build_options_section(row=2)
         self._build_output_section(row=3)
         self._build_action_buttons(row=4)
-        self._build_status_bar(row=5)
+        self._build_status_bar(row=4)
 
     def _build_header(self, row: int):
         """Header section."""
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.grid(row=row, column=0, sticky="ew", pady=(0, 8))
+        header_frame.grid(row=row, column=0, sticky="ew", pady=(0, 5))
 
         # Small corner app icon
         try:
@@ -459,16 +467,22 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         except Exception:
             pass
 
+        title_stack = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_stack.pack(side="left", fill="x", expand=True)
+
+        title_row = ctk.CTkFrame(title_stack, fg_color="transparent")
+        title_row.pack(anchor="w")
+
         self.title_label = ctk.CTkLabel(
-            header_frame,
+            title_row,
             text="YouTube Knowledge Clipper",
-            font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
             text_color=C_TEXT,
         )
         self.title_label.pack(side="left")
 
         version_label = ctk.CTkLabel(
-            header_frame,
+            title_row,
             text=f"v{APP_VERSION}",
             font=ctk.CTkFont(size=11),
             text_color=C_TEXT_DIM,
@@ -479,11 +493,19 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         version_label.pack(side="left", padx=(10, 0))
 
+        subtitle_label = ctk.CTkLabel(
+            title_stack,
+            text="Transcript, video download và Speech-to-Text trong một màn hình",
+            font=ctk.CTkFont(size=11),
+            text_color=C_TEXT_DIM,
+        )
+        subtitle_label.pack(anchor="w", pady=(1, 0))
+
         # About button
         self.about_btn = ctk.CTkButton(
             header_frame,
             text="ℹ️ About",
-            width=70,
+            width=82,
             height=28,
             fg_color="transparent",
             hover_color=C_BORDER,
@@ -496,7 +518,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.tutorial_btn = ctk.CTkButton(
             header_frame,
             text="📖 Hướng dẫn",
-            width=90,
+            width=106,
             height=28,
             fg_color="transparent",
             hover_color=C_BORDER,
@@ -504,6 +526,18 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             command=self._show_tutorial
         )
         self.tutorial_btn.pack(side="right", padx=(0, 5))
+
+        self.settings_btn = ctk.CTkButton(
+            header_frame,
+            text="⚙️ Settings",
+            width=92,
+            height=28,
+            fg_color="transparent",
+            hover_color=C_BORDER,
+            text_color=C_TEXT_DIM,
+            command=self._show_settings,
+        )
+        self.settings_btn.pack(side="right", padx=(0, 5))
 
     def _build_input_section(self, row: int):
         """URL input + Get Transcript button."""
@@ -514,8 +548,11 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             border_width=1,
             border_color=C_BORDER,
         )
-        self.input_card.grid(row=row, column=0, sticky="ew", pady=(0, 8))
+        self.input_card.grid(row=row, column=0, sticky="ew", pady=(0, 6))
         self.input_card.columnconfigure(0, weight=1)
+
+        self.input_card.columnconfigure(1, weight=0)
+        self.input_card.columnconfigure(2, weight=0)
 
         url_label = ctk.CTkLabel(
             self.input_card,
@@ -523,68 +560,93 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=C_TEXT_DIM,
         )
-        url_label.grid(row=0, column=0, columnspan=4, sticky="w", padx=16, pady=(12, 4))
+        url_label.grid(row=0, column=0, columnspan=3, sticky="w", padx=14, pady=(8, 3))
 
         self.url_entry = ctk.CTkEntry(
             self.input_card,
-            placeholder_text="Paste YouTube URL here... (Hoặc bôi đen link và bấm Ctrl + Shift + C)",
-            font=ctk.CTkFont(size=13),
-            height=42,
+            placeholder_text="Dán link YouTube vào đây...",
+            font=ctk.CTkFont(size=12),
+            height=36,
             fg_color=C_BG_INPUT,
             border_color=C_BORDER,
             text_color=C_TEXT,
             corner_radius=10,
         )
-        self.url_entry.grid(row=1, column=0, sticky="ew", padx=(16, 8), pady=(0, 4))
+        self.url_entry.grid(row=1, column=0, sticky="ew", padx=(14, 6), pady=(0, 7))
         self.url_entry.bind("<Return>", lambda e: self._on_get_transcript())
-        
-        hint_label = ctk.CTkLabel(
+
+        self.paste_url_btn = ctk.CTkButton(
             self.input_card,
-            text="💡 Mẹo: Bôi đen một link YouTube bất kỳ đâu (trên trình duyệt, tin nhắn...) và nhấn Ctrl + Shift + C để app tự động copy và xử lý!",
-            font=ctk.CTkFont(size=11, slant="italic"),
-            text_color=C_TEXT_DIM,
+            text="📋 Dán",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            height=36,
+            width=86,
+            fg_color=C_BG_ELEVATED,
+            hover_color=C_BORDER,
+            text_color=C_TEXT,
+            corner_radius=10,
+            command=self._on_paste_url,
         )
-        hint_label.grid(row=2, column=0, columnspan=4, sticky="w", padx=16, pady=(0, 10))
+        self.paste_url_btn.grid(row=1, column=1, sticky="e", padx=(0, 6), pady=(0, 7))
+
+        self.clear_url_btn = ctk.CTkButton(
+            self.input_card,
+            text="✕",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            height=36,
+            width=46,
+            fg_color=C_BG_ELEVATED,
+            hover_color=C_BORDER,
+            text_color=C_TEXT_DIM,
+            corner_radius=10,
+            command=self._on_clear_url,
+        )
+        self.clear_url_btn.grid(row=1, column=2, sticky="e", padx=(0, 14), pady=(0, 7))
+        self.url_utility_buttons = [self.paste_url_btn, self.clear_url_btn]
+
+        action_row = ctk.CTkFrame(self.input_card, fg_color="transparent")
+        action_row.grid(row=2, column=0, columnspan=3, sticky="ew", padx=14, pady=(0, 9))
+        action_row.columnconfigure(0, weight=1, uniform="input_actions")
+        action_row.columnconfigure(1, weight=1, uniform="input_actions")
+        action_row.columnconfigure(2, weight=0)
 
         self.get_btn = ctk.CTkButton(
-            self.input_card,
-            text="⚡ Get Transcript",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            height=42,
-            width=150,
+            action_row,
+            text="⚡ Lấy Transcript",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            height=36,
             fg_color=C_ACCENT,
             hover_color=C_ACCENT_HOVER,
             corner_radius=10,
             command=self._on_get_transcript,
         )
-        self.get_btn.grid(row=1, column=1, sticky="e", padx=(0, 8), pady=(0, 4))
+        self.get_btn.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
         self.download_video_btn = ctk.CTkButton(
-            self.input_card,
-            text="⬇️ Download",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            height=42,
-            width=150,
+            action_row,
+            text="⬇️ Tải Video",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            height=36,
             fg_color=C_PURPLE,
             hover_color=self._lighten_color(C_PURPLE),
             corner_radius=10,
             command=self._on_download_video,
         )
-        self.download_video_btn.grid(row=1, column=2, sticky="e", padx=(0, 8), pady=(0, 4))
+        self.download_video_btn.grid(row=0, column=1, sticky="ew", padx=(0, 8))
 
         self.cancel_btn = ctk.CTkButton(
-            self.input_card,
+            action_row,
             text="⛔ Hủy",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            height=42,
-            width=110,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            height=36,
+            width=112,
             fg_color=C_RED,
             hover_color=self._lighten_color(C_RED),
             corner_radius=10,
             state="disabled",
             command=self._on_cancel_processing,
         )
-        self.cancel_btn.grid(row=1, column=3, sticky="e", padx=(0, 16), pady=(0, 4))
+        self.cancel_btn.grid(row=0, column=2, sticky="e")
 
     def _build_options_section(self, row: int):
         """Options: Language, Mode, Whisper settings, Show timestamps toggle."""
@@ -595,14 +657,16 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             border_width=1,
             border_color=C_BORDER,
         )
-        self.options_card.grid(row=row, column=0, sticky="ew", pady=(0, 8))
+        self.options_card.grid(row=row, column=0, sticky="ew", pady=(0, 6))
 
-        for i in range(5):
-            self.options_card.columnconfigure(i, weight=1)
+        for i in range(6):
+            self.options_card.columnconfigure(i, weight=1, uniform="options")
 
-        # ── Row 0-1: Language
         self._make_option_label(self.options_card, "🌐 Language", 0, 0)
-        self.language_var = ctk.StringVar(value="Auto")
+        language_value = self.settings.get("selected_language", "Auto")
+        if language_value not in LANGUAGES:
+            language_value = "Auto"
+        self.language_var = ctk.StringVar(value=language_value)
         self.language_dropdown = ctk.CTkOptionMenu(
             self.options_card,
             variable=self.language_var,
@@ -614,13 +678,16 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             dropdown_fg_color=C_BG_CARD,
             dropdown_hover_color=C_ACCENT,
             corner_radius=8,
-            width=130,
+            width=160,
+            command=lambda _choice: self._save_current_preferences(),
         )
-        self.language_dropdown.grid(row=1, column=0, padx=16, pady=(0, 12), sticky="w")
+        self.language_dropdown.grid(row=1, column=0, sticky="ew", padx=(14, 5), pady=(0, 6))
 
-        # ── Row 0-1: Mode
         self._make_option_label(self.options_card, "⚙️ Mode", 0, 1)
-        self.mode_var = ctk.StringVar(value="Auto")
+        mode_value = self.settings.get("selected_mode", "Auto")
+        if mode_value not in MODES:
+            mode_value = "Auto"
+        self.mode_var = ctk.StringVar(value=mode_value)
         self.mode_dropdown = ctk.CTkOptionMenu(
             self.options_card,
             variable=self.mode_var,
@@ -633,12 +700,15 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             dropdown_hover_color=C_ACCENT,
             corner_radius=8,
             width=180,
+            command=lambda _choice: self._save_current_preferences(),
         )
-        self.mode_dropdown.grid(row=1, column=1, padx=16, pady=(0, 12), sticky="w")
+        self.mode_dropdown.grid(row=1, column=1, sticky="ew", padx=5, pady=(0, 6))
 
-        # ── Row 0-1: Whisper Model
-        self._make_option_label(self.options_card, "🤖 Whisper Model", 0, 2)
-        self.whisper_model_var = ctk.StringVar(value="small")
+        self._make_option_label(self.options_card, "🤖 Whisper", 0, 2)
+        whisper_model_value = self.settings.get("selected_whisper_model", "small")
+        if whisper_model_value not in WHISPER_MODELS:
+            whisper_model_value = "small"
+        self.whisper_model_var = ctk.StringVar(value=whisper_model_value)
         self.whisper_model_dropdown = ctk.CTkOptionMenu(
             self.options_card,
             variable=self.whisper_model_var,
@@ -650,45 +720,12 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             dropdown_fg_color=C_BG_CARD,
             dropdown_hover_color=C_ACCENT,
             corner_radius=8,
-            width=120,
+            width=160,
+            command=lambda _choice: self._save_current_preferences(),
         )
-        self.whisper_model_dropdown.grid(row=1, column=2, padx=16, pady=(0, 12), sticky="w")
+        self.whisper_model_dropdown.grid(row=1, column=2, sticky="ew", padx=5, pady=(0, 6))
 
-        # ── Row 0-1: Device
-        self._make_option_label(self.options_card, "💻 Device", 0, 3)
-        self.device_label = ctk.CTkLabel(
-            self.options_card,
-            text="CPU • int8",
-            font=ctk.CTkFont(size=12),
-            text_color=C_TEXT_DIM,
-            fg_color=C_BG_INPUT,
-            corner_radius=8,
-            padx=12,
-            pady=4,
-            width=100,
-        )
-        self.device_label.grid(row=1, column=3, padx=16, pady=(0, 12), sticky="w")
-
-        # ── Row 0-1: Show Timestamps Toggle
-        self._make_option_label(self.options_card, "⏱️ Timestamps", 0, 4)
-        self.show_timestamps_var = ctk.BooleanVar(value=True)
-        self.timestamps_switch = ctk.CTkSwitch(
-            self.options_card,
-            text="Show",
-            font=ctk.CTkFont(size=12),
-            variable=self.show_timestamps_var,
-            onvalue=True,
-            offvalue=False,
-            fg_color=C_BORDER,
-            progress_color=C_ACCENT,
-            button_color=C_TEXT,
-            button_hover_color=C_ACCENT_HOVER,
-            command=self._on_toggle_timestamps,
-        )
-        self.timestamps_switch.grid(row=1, column=4, padx=16, pady=(0, 12), sticky="w")
-
-        # ── Row 2-3: Download Format
-        self._make_option_label(self.options_card, "📥 Download Format", 2, 0)
+        self._make_option_label(self.options_card, "📥 Format", 0, 3)
         self.download_format_var = ctk.StringVar(value="Video (MP4)")
         self.download_format_dropdown = ctk.CTkOptionMenu(
             self.options_card,
@@ -704,10 +741,9 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             width=130,
             command=self._on_format_change
         )
-        self.download_format_dropdown.grid(row=3, column=0, padx=16, pady=(0, 16), sticky="w")
+        self.download_format_dropdown.grid(row=1, column=3, sticky="ew", padx=5, pady=(0, 6))
 
-        # ── Row 2-3: Video Quality
-        self._make_option_label(self.options_card, "🎞️ Video Quality", 2, 1)
+        self._make_option_label(self.options_card, "🎞️ Quality", 0, 4)
         self.video_quality_var = ctk.StringVar(value="480p")
         self.video_quality_dropdown = ctk.CTkOptionMenu(
             self.options_card,
@@ -722,10 +758,9 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             corner_radius=8,
             width=180,
         )
-        self.video_quality_dropdown.grid(row=3, column=1, padx=16, pady=(0, 16), sticky="w")
+        self.video_quality_dropdown.grid(row=1, column=4, sticky="ew", padx=5, pady=(0, 6))
 
-        # ── Row 2-3: Browser Cookies
-        self._make_option_label(self.options_card, "🍪 Browser Cookies", 2, 2)
+        self._make_option_label(self.options_card, "🍪 Cookies", 0, 5)
         self.cookie_browser_var = ctk.StringVar(value="Auto")
         self.cookie_browser_dropdown = ctk.CTkOptionMenu(
             self.options_card,
@@ -740,7 +775,35 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             corner_radius=8,
             width=150,
         )
-        self.cookie_browser_dropdown.grid(row=3, column=2, padx=16, pady=(0, 16), sticky="w")
+        self.cookie_browser_dropdown.grid(row=1, column=5, sticky="ew", padx=(5, 14), pady=(0, 6))
+
+        self.show_timestamps_var = ctk.BooleanVar(value=bool(self.settings.get("show_timestamps", True)))
+        self.timestamps_switch = ctk.CTkSwitch(
+            self.options_card,
+            text="Hiện timestamp",
+            font=ctk.CTkFont(size=12),
+            variable=self.show_timestamps_var,
+            onvalue=True,
+            offvalue=False,
+            fg_color=C_BORDER,
+            progress_color=C_ACCENT,
+            button_color=C_TEXT,
+            button_hover_color=C_ACCENT_HOVER,
+            command=self._on_toggle_timestamps,
+        )
+        self.timestamps_switch.grid(row=2, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 7))
+
+        self.device_label = ctk.CTkLabel(
+            self.options_card,
+            text="CPU • int8",
+            font=ctk.CTkFont(size=12),
+            text_color=C_TEXT_DIM,
+            fg_color=C_BG_INPUT,
+            corner_radius=8,
+            padx=10,
+            pady=4,
+        )
+        self.device_label.grid(row=2, column=5, sticky="e", padx=(5, 14), pady=(0, 7))
 
     def _on_format_change(self, choice):
         """Disable quality dropdown if Audio is selected."""
@@ -756,7 +819,9 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=C_TEXT_DIM,
         )
-        label.grid(row=row, column=col, sticky="w", padx=16, pady=(10, 2))
+        left_pad = 14 if col == 0 else 5
+        right_pad = 14 if col == 5 else 5
+        label.grid(row=row, column=col, sticky="w", padx=(left_pad, right_pad), pady=(7, 2))
 
     def _build_output_section(self, row: int):
         """Transcript output textbox."""
@@ -769,12 +834,12 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.output_card.grid(row=row, column=0, sticky="nsew", pady=(0, 8))
         self.output_card.columnconfigure(0, weight=1)
-        self.output_card.rowconfigure(1, weight=1)
-        self.main_frame.rowconfigure(row, weight=1)
+        self.output_card.rowconfigure(2, weight=1, minsize=OUTPUT_DEFAULT_HEIGHT)
+        self.main_frame.rowconfigure(row, weight=4, minsize=OUTPUT_DEFAULT_HEIGHT)
 
         # Output header
         output_header = ctk.CTkFrame(self.output_card, fg_color="transparent")
-        output_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(10, 4))
+        output_header.grid(row=0, column=0, sticky="ew", padx=12, pady=(6, 2))
 
         ctk.CTkLabel(
             output_header,
@@ -791,6 +856,18 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.word_count_label.pack(side="right")
 
+        self.output_state_label = ctk.CTkLabel(
+            output_header,
+            text="Chưa có transcript",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=C_TEXT_DIM,
+            fg_color=C_BG_INPUT,
+            corner_radius=8,
+            padx=8,
+            pady=2,
+        )
+        self.output_state_label.pack(side="right", padx=(0, 10))
+
         # Textbox
         self.output_text = ctk.CTkTextbox(
             self.output_card,
@@ -801,8 +878,9 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             corner_radius=8,
             wrap="word",
             activate_scrollbars=True,
+            height=OUTPUT_DEFAULT_HEIGHT,
         )
-        self.output_text.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 14))
+        self.output_text.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 8))
 
         self.download_wait_frame = ctk.CTkFrame(
             self.output_card,
@@ -810,7 +888,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             corner_radius=8,
             border_width=0,
         )
-        self.download_wait_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 14))
+        self.download_wait_frame.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 8))
         self.download_wait_frame.grid_columnconfigure(0, weight=1)
         self.download_wait_frame.grid_rowconfigure(1, weight=1)
         self.download_wait_frame.grid_remove()
@@ -820,6 +898,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             text="Đang chuẩn bị tải video",
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color=C_TEXT,
+            wraplength=680,
         )
         self.download_wait_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(18, 4))
 
@@ -836,8 +915,10 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             text="Neon Download Portal",
             font=ctk.CTkFont(size=12),
             text_color=C_TEXT_DIM,
+            wraplength=720,
+            justify="center",
         )
-        self.download_wait_status.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 16))
+        self.download_wait_status.grid(row=2, column=0, sticky="ew", padx=12, pady=(4, 10))
 
         self.download_wait_active = False
         self.download_wait_step = 0
@@ -849,21 +930,59 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _show_placeholder(self):
         """Show placeholder text."""
         self._hide_download_waiting()
+        self._set_output_expanded(False)
+        self.output_text.tkraise()
         self.output_text.configure(text_color=C_TEXT_DIM)
         self.output_text.delete("1.0", "end")
         placeholder = (
-            "Chào bạn! Mình là YouTube Knowledge Clipper\n\n"
-            "Bước 1: 🔗 Paste YouTube URL\n"
-            "Bước 2: ⚙️ Chọn options\n"
-            "Bước 3: ⚡ Bấm \"Get Transcript\"\n"
+            "Chưa có transcript\n\n"
+            "Dán link YouTube để bắt đầu. Kết quả transcript sẽ xuất hiện ở đây."
         )
         self.output_text.insert("1.0", placeholder)
+        if hasattr(self, "output_state_label"):
+            self.output_state_label.configure(text="Chưa có transcript", text_color=C_TEXT_DIM)
+        if hasattr(self, "word_count_label"):
+            self.word_count_label.configure(text="")
+        self._sync_output_actions()
+
+    def _set_output_expanded(self, expanded: bool):
+        """Resize the transcript area so fetched content is immediately readable."""
+        height = OUTPUT_EXPANDED_HEIGHT if expanded else OUTPUT_DEFAULT_HEIGHT
+        weight = 6 if expanded else 4
+        try:
+            self.main_frame.rowconfigure(3, weight=weight, minsize=height)
+            self.output_card.rowconfigure(2, weight=1, minsize=height)
+            self.output_text.configure(height=height)
+        except Exception:
+            pass
+
+    def _show_output_loading(self, title: str, detail: str = ""):
+        """Show a lightweight loading message in the transcript output area."""
+        def _update():
+            self.download_wait_active = False
+            try:
+                self.download_wait_frame.grid_remove()
+            except Exception:
+                pass
+            self._set_output_expanded(False)
+            self.output_text.tkraise()
+            self.output_text.configure(text_color=C_TEXT_DIM)
+            self.output_text.delete("1.0", "end")
+            message = title.strip()
+            if detail:
+                message = f"{message}\n\n{detail.strip()}"
+            self.output_text.insert("1.0", message)
+            self.word_count_label.configure(text="")
+            self.output_state_label.configure(text=title, text_color=C_ACCENT)
+            self._sync_output_actions()
+        self.after(0, _update)
 
     def _show_download_waiting(self, title: str = "Đang tải video") -> None:
         """Show a lightweight waiting animation while yt-dlp is downloading."""
         def _update():
             self.download_wait_title.configure(text=title)
             self.download_wait_status.configure(text="Đang kết nối YouTube...")
+            self.output_state_label.configure(text="Đang tải", text_color=C_ACCENT)
             self.download_wait_active = True
             self.download_wait_step = 0
             self.download_wait_frame.grid()
@@ -886,6 +1005,11 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 self.download_wait_frame.grid_remove()
             except Exception:
                 pass
+            if hasattr(self, "output_state_label"):
+                if self.current_segments:
+                    self.output_state_label.configure(text="Có transcript", text_color=C_ACCENT_2)
+                else:
+                    self.output_state_label.configure(text="Chưa có transcript", text_color=C_TEXT_DIM)
         self.after(0, _update)
 
     def _update_download_waiting_status(self, text: str, progress: float | None = None) -> None:
@@ -1058,52 +1182,41 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         canvas.create_line(center_x - 36, arrow_y + 46, center_x + 36, arrow_y + 46, fill=arrow_color, width=5)
 
-        # Top label.
-        canvas.create_text(
-            center_x,
-            max(24, center_y - ring_ry - 20),
-            text="Neon Download Portal",
-            fill=C_TEXT,
-            font=("Segoe UI", 14, "bold"),
-        )
-        canvas.create_text(
-            center_x,
-            max(45, center_y - ring_ry + 2),
-            text="pulling video streams into your library",
-            fill=C_TEXT_DIM,
-            font=("Segoe UI", 10),
-        )
-
         self.download_wait_step += 1
         self.download_wait_job = self.after(36, self._animate_download_waiting)
 
     def _build_action_buttons(self, row: int):
         """Action buttons."""
-        self.btn_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.btn_frame.grid(row=row, column=0, sticky="ew", pady=(0, 4))
+        self.btn_frame = ctk.CTkFrame(self.output_card, fg_color="transparent")
+        self.btn_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 5))
 
         buttons = [
-            ("📋 Copy", C_ACCENT, self._on_copy),
-            ("💾 Save TXT", "#2d6a4f", self._on_save_txt),
-            ("📝 Save MD", "#6d28d9", self._on_save_markdown),
-            ("🎬 Save SRT", C_ORANGE, self._on_save_srt),
-            ("🗑️ Clear", "#6e7681", self._on_clear),
+            ("📋 Copy", C_ACCENT, self._on_copy, True),
+            ("💾 Save TXT", "#2d6a4f", self._on_save_txt, True),
+            ("📝 Save MD", "#6d28d9", self._on_save_markdown, True),
+            ("🎬 Save SRT", C_ORANGE, self._on_save_srt, True),
+            ("🗑️ Clear", "#6e7681", self._on_clear, False),
         ]
 
         self.action_buttons = []
-        for text, color, cmd in buttons:
+        self.output_action_buttons = []
+        for text, color, cmd, requires_output in buttons:
             btn = ctk.CTkButton(
                 self.btn_frame,
                 text=text,
                 font=ctk.CTkFont(size=12, weight="bold"),
-                height=38,
+                height=28,
                 fg_color=color,
                 hover_color=self._lighten_color(color),
-                corner_radius=10,
+                corner_radius=8,
                 command=cmd,
             )
-            btn.pack(side="left", padx=(0, 8), expand=True, fill="x")
+            btn.pack(side="left", padx=(0, 6), expand=True, fill="x")
             self.action_buttons.append(btn)
+            if requires_output:
+                self.output_action_buttons.append(btn)
+
+        self._sync_output_actions()
 
     def _build_status_bar(self, row: int):
         """Status bar."""
@@ -1111,19 +1224,20 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             self.main_frame,
             fg_color=C_BG_CARD,
             corner_radius=8,
-            height=38,
+            height=34,
         )
-        self.status_frame.grid(row=row, column=0, sticky="ew", pady=(0, 4))
+        self.status_frame.grid(row=row, column=0, sticky="ew", pady=(0, 2))
+        self.status_frame.grid_columnconfigure(0, weight=1)
 
         self.status_label = ctk.CTkLabel(
             self.status_frame,
-            text="✅ Ready — Paste a YouTube URL to get started!",
+            text="✅ Sẵn sàng — dán YouTube URL để bắt đầu",
             font=ctk.CTkFont(size=12),
             text_color=C_ACCENT_2,
             anchor="w",
             wraplength=600,
         )
-        self.status_label.pack(side="left", padx=16, pady=6)
+        self.status_label.grid(row=0, column=0, sticky="ew", padx=12, pady=4)
 
         self.progress_value_label = ctk.CTkLabel(
             self.status_frame,
@@ -1132,6 +1246,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             text_color=C_TEXT_DIM,
             width=48,
         )
+        self.progress_value_label.grid(row=0, column=2, padx=(8, 12), pady=4)
+        self.progress_value_label.grid_remove()
 
         # Progress bar (hidden)
         self.progress_bar = ctk.CTkProgressBar(
@@ -1142,6 +1258,12 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             progress_color=C_ACCENT,
             fg_color=C_BG_INPUT,
             corner_radius=2,
+        )
+        self.progress_bar.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=4)
+        self.progress_bar.grid_remove()
+        self.status_frame.bind(
+            "<Configure>",
+            lambda event: self.status_label.configure(wraplength=max(event.width - 310, 280)),
         )
 
     # ═════════════════════════════════════════════════════════════
@@ -1184,11 +1306,46 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         if progress is not None:
             self._set_progress(progress)
 
+    def _save_current_preferences(self) -> None:
+        """Persist currently selected transcript preferences."""
+        try:
+            self.settings.update({
+                "selected_language": self.language_var.get(),
+                "selected_mode": self.mode_var.get(),
+                "selected_whisper_model": self.whisper_model_var.get(),
+                "show_timestamps": bool(self.show_timestamps_var.get()),
+            })
+            self.settings = save_settings(self.settings)
+        except Exception as e:
+            print(f"Cannot save settings: {e}")
+
+    def _on_close(self):
+        """Persist preferences and close the app."""
+        self._save_current_preferences()
+        try:
+            self.destroy()
+        except Exception:
+            pass
+
+    def _sync_output_actions(self):
+        """Keep export actions aligned with whether transcript data is available."""
+        if not hasattr(self, "output_action_buttons"):
+            return
+
+        state = "normal" if self.current_segments and not self.is_processing else "disabled"
+        for button in self.output_action_buttons:
+            try:
+                button.configure(state=state)
+            except Exception:
+                pass
+
     def _set_controls_enabled(self, enabled: bool):
         """Enable/disable controls that should not change while a task is running."""
         state = "normal" if enabled else "disabled"
         controls = [
             self.url_entry,
+            *getattr(self, "url_utility_buttons", []),
+            self.settings_btn,
             self.language_dropdown,
             self.mode_dropdown,
             self.whisper_model_dropdown,
@@ -1207,6 +1364,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         if enabled:
             self._on_format_change(self.download_format_var.get())
+            self._sync_output_actions()
 
     def _set_processing(self, active: bool, button: str = "all"):
         """Enable/disable processing state (thread-safe)."""
@@ -1215,24 +1373,24 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             if active:
                 self._set_controls_enabled(False)
                 if button in ("all", "transcript"):
-                    self.get_btn.configure(state="disabled", text="⏳ Processing...")
+                    self.get_btn.configure(state="disabled", text="⏳ Đang lấy...")
                 if button in ("all", "video"):
-                    self.download_video_btn.configure(state="disabled", text="⏳ Downloading...")
+                    self.download_video_btn.configure(state="disabled", text="⏳ Đang tải...")
                 self.cancel_btn.configure(state="normal", text="⛔ Hủy")
                 self.progress_value_label.configure(text="...")
-                self.progress_value_label.pack(side="right", padx=(8, 16), pady=6)
-                self.progress_bar.pack(side="right", padx=(8, 0), fill="x", expand=True)
+                self.progress_value_label.grid()
+                self.progress_bar.grid()
                 self.progress_bar.configure(mode="indeterminate")
                 self.progress_bar.start()
             else:
                 self._set_controls_enabled(True)
-                self.get_btn.configure(state="normal", text="⚡ Get Transcript")
-                self.download_video_btn.configure(state="normal", text="⬇️ Download")
+                self.get_btn.configure(state="normal", text="⚡ Lấy Transcript")
+                self.download_video_btn.configure(state="normal", text="⬇️ Tải Video")
                 self.cancel_btn.configure(state="disabled", text="⛔ Hủy")
                 self.progress_bar.stop()
                 self.progress_bar.set(0)
-                self.progress_bar.pack_forget()
-                self.progress_value_label.pack_forget()
+                self.progress_bar.grid_remove()
+                self.progress_value_label.grid_remove()
         self.after(0, _update)
 
     def _on_cancel_processing(self):
@@ -1246,13 +1404,35 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _set_output(self, text: str):
         """Set output textbox content (thread-safe)."""
         def _update():
-            self._hide_download_waiting()
+            self.download_wait_active = False
+            if self.download_wait_job is not None:
+                try:
+                    self.after_cancel(self.download_wait_job)
+                except Exception:
+                    pass
+                self.download_wait_job = None
+            try:
+                self.download_wait_canvas.delete("all")
+                self.download_wait_frame.grid_remove()
+            except Exception:
+                pass
+
+            self._set_output_expanded(True)
+            self.output_text.grid()
+            self.output_text.tkraise()
             self.output_text.configure(text_color=C_TEXT)
             self.output_text.delete("1.0", "end")
-            self.output_text.insert("1.0", text)
-            words = len(text.split())
-            lines = text.count("\n") + 1
-            self.word_count_label.configure(text=f"{words:,} words  •  {lines:,} lines")
+            display_text = text.strip() or "Không có nội dung transcript để hiển thị."
+            self.output_text.insert("1.0", display_text)
+            try:
+                self.output_text.yview_moveto(0)
+            except Exception:
+                pass
+            words = len(display_text.split())
+            lines = display_text.count("\n") + 1
+            self.word_count_label.configure(text=f"{words:,} từ  •  {lines:,} dòng")
+            self.output_state_label.configure(text="Đang hiển thị transcript", text_color=C_ACCENT_2)
+            self._sync_output_actions()
         self.after(0, _update)
 
     def _refresh_output(self):
@@ -1265,6 +1445,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
     def _on_toggle_timestamps(self):
         """Handle timestamp toggle switch."""
+        self._save_current_preferences()
         self._refresh_output()
 
     def _on_global_hotkey(self):
@@ -1302,6 +1483,143 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # Fill entry
         self.url_entry.delete(0, "end")
         self.url_entry.insert(0, url)
+        self.url_entry.configure(border_color=C_ACCENT)
+        self._set_status("✅ URL đã sẵn sàng", C_ACCENT_2)
+
+    def _show_settings(self):
+        """Show app settings for Obsidian and Markdown export."""
+        settings_win = ctk.CTkToplevel(self)
+        settings_win.title("Settings")
+        settings_win.geometry("620x430")
+        settings_win.resizable(False, False)
+        settings_win.attributes("-topmost", True)
+
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 620) // 2
+        y = self.winfo_y() + (self.winfo_height() - 430) // 2
+        settings_win.geometry(f"+{x}+{y}")
+
+        settings_win.grid_columnconfigure(0, weight=1)
+
+        container = ctk.CTkFrame(
+            settings_win,
+            fg_color=C_BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=C_BORDER,
+        )
+        container.grid(row=0, column=0, sticky="nsew", padx=16, pady=16)
+        container.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            container,
+            text="Obsidian Export",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=C_TEXT,
+        ).grid(row=0, column=0, columnspan=3, sticky="w", padx=16, pady=(16, 12))
+
+        vault_var = ctk.StringVar(value=str(self.settings.get("obsidian_vault_path", "")))
+        subfolder_var = ctk.StringVar(value=str(self.settings.get("obsidian_subfolder", "Resources/YouTube")))
+        pattern_var = ctk.StringVar(value=str(self.settings.get("filename_pattern", "{date_compact}_{title}")))
+        markdown_mode_var = ctk.StringVar(value=str(self.settings.get("markdown_mode", "Clean Transcript")))
+        auto_open_var = ctk.BooleanVar(value=bool(self.settings.get("auto_open_after_export", False)))
+
+        def add_label(text: str, row: int):
+            ctk.CTkLabel(
+                container,
+                text=text,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color=C_TEXT_DIM,
+            ).grid(row=row, column=0, sticky="w", padx=16, pady=(0, 6))
+
+        add_label("Obsidian Vault Path", 1)
+        vault_entry = ctk.CTkEntry(container, textvariable=vault_var, fg_color=C_BG_INPUT)
+        vault_entry.grid(row=2, column=0, columnspan=2, sticky="ew", padx=(16, 8), pady=(0, 12))
+
+        def browse_vault():
+            selected = filedialog.askdirectory(
+                title="Chọn Obsidian vault hoặc folder",
+                initialdir=vault_var.get() or str(get_base_dir()),
+                parent=settings_win,
+            )
+            if selected:
+                vault_var.set(selected)
+
+        ctk.CTkButton(
+            container,
+            text="Browse",
+            width=86,
+            command=browse_vault,
+        ).grid(row=2, column=2, sticky="e", padx=(0, 16), pady=(0, 12))
+
+        add_label("Default subfolder", 3)
+        subfolder_entry = ctk.CTkEntry(container, textvariable=subfolder_var, fg_color=C_BG_INPUT)
+        subfolder_entry.grid(row=4, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 12))
+
+        add_label("Filename pattern", 5)
+        pattern_entry = ctk.CTkEntry(container, textvariable=pattern_var, fg_color=C_BG_INPUT)
+        pattern_entry.grid(row=6, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 4))
+        ctk.CTkLabel(
+            container,
+            text="Placeholders: {date_compact}, {date}, {title}, {video_id}, {channel}, {language}",
+            font=ctk.CTkFont(size=11),
+            text_color=C_TEXT_DIM,
+        ).grid(row=7, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 12))
+
+        add_label("Markdown mode", 8)
+        mode_dropdown = ctk.CTkOptionMenu(
+            container,
+            variable=markdown_mode_var,
+            values=MARKDOWN_MODES,
+            fg_color=C_BG_INPUT,
+            button_color=C_BORDER,
+            button_hover_color=C_ACCENT,
+            dropdown_fg_color=C_BG_CARD,
+            dropdown_hover_color=C_ACCENT,
+        )
+        mode_dropdown.grid(row=9, column=0, columnspan=2, sticky="ew", padx=(16, 8), pady=(0, 12))
+
+        auto_open_switch = ctk.CTkSwitch(
+            container,
+            text="Auto open file after export",
+            variable=auto_open_var,
+            fg_color=C_BORDER,
+            progress_color=C_ACCENT,
+            button_color=C_TEXT,
+            button_hover_color=C_ACCENT_HOVER,
+        )
+        auto_open_switch.grid(row=9, column=2, sticky="w", padx=(0, 16), pady=(0, 12))
+
+        button_row = ctk.CTkFrame(container, fg_color="transparent")
+        button_row.grid(row=10, column=0, columnspan=3, sticky="ew", padx=16, pady=(4, 16))
+        button_row.columnconfigure(0, weight=1)
+
+        def save_dialog_settings():
+            self.settings.update({
+                "obsidian_vault_path": vault_var.get().strip(),
+                "obsidian_subfolder": subfolder_var.get().strip() or "Resources/YouTube",
+                "filename_pattern": pattern_var.get().strip() or "{date_compact}_{title}",
+                "markdown_mode": markdown_mode_var.get(),
+                "auto_open_after_export": bool(auto_open_var.get()),
+            })
+            self.settings = save_settings(self.settings)
+            self._set_status("✅ Đã lưu settings", C_ACCENT_2)
+            settings_win.destroy()
+
+        ctk.CTkButton(
+            button_row,
+            text="Save",
+            width=110,
+            command=save_dialog_settings,
+        ).pack(side="right")
+        ctk.CTkButton(
+            button_row,
+            text="Cancel",
+            width=110,
+            fg_color=C_BG_ELEVATED,
+            hover_color=C_BORDER,
+            command=settings_win.destroy,
+        ).pack(side="right", padx=(0, 8))
 
     def _show_about(self):
         """Show About dialog with author info and image."""
@@ -1615,6 +1933,54 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             )
             lbl.pack(expand=True)
 
+    def _mark_url_attention(self, color: str = C_RED):
+        """Briefly highlight the URL field when input needs attention."""
+        try:
+            self.url_entry.configure(border_color=color)
+            self.url_entry.focus_set()
+            self.after(1200, lambda: self.url_entry.configure(border_color=C_BORDER))
+        except Exception:
+            pass
+
+    def _on_paste_url(self):
+        """Paste clipboard text into the URL field."""
+        if self.is_processing:
+            return
+
+        try:
+            text = pyperclip.paste().strip()
+        except Exception:
+            try:
+                text = self.clipboard_get().strip()
+            except Exception:
+                text = ""
+
+        if not text:
+            self._mark_url_attention(C_ORANGE)
+            self._set_status("⚠️ Clipboard đang trống", C_ORANGE)
+            return
+
+        self.url_entry.delete(0, "end")
+        self.url_entry.insert(0, text)
+        self.url_entry.focus_set()
+
+        try:
+            extract_video_id(text)
+            self.url_entry.configure(border_color=C_ACCENT)
+            self._set_status("✅ URL đã sẵn sàng", C_ACCENT_2)
+        except ValueError:
+            self._mark_url_attention(C_ORANGE)
+            self._set_status("⚠️ Clipboard không giống YouTube URL", C_ORANGE)
+
+    def _on_clear_url(self):
+        """Clear the URL field and return focus to it."""
+        if self.is_processing:
+            return
+        self.url_entry.delete(0, "end")
+        self.url_entry.configure(border_color=C_BORDER)
+        self.url_entry.focus_set()
+        self._set_status("✅ Sẵn sàng — dán YouTube URL để bắt đầu", C_ACCENT_2)
+
     def _on_get_transcript(self):
         """Handle Get Transcript button click."""
         if self.is_processing:
@@ -1622,12 +1988,14 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         url = self.url_entry.get().strip()
         if not url:
+            self._mark_url_attention(C_ORANGE)
             self._set_status("⚠️ Vui lòng nhập YouTube URL", C_ORANGE)
             return
 
         try:
             video_id = extract_video_id(url)
         except ValueError as e:
+            self._mark_url_attention()
             self._set_status(f"❌ {str(e).split(chr(10))[0]}", C_RED)
             messagebox.showerror("URL không hợp lệ", str(e))
             return
@@ -1652,12 +2020,14 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         url = self.url_entry.get().strip()
         if not url:
+            self._mark_url_attention(C_ORANGE)
             self._set_status("⚠️ Vui lòng nhập YouTube URL", C_ORANGE)
             return
 
         try:
             video_id = extract_video_id(url)
         except ValueError as e:
+            self._mark_url_attention()
             self._set_status(f"❌ {str(e).split(chr(10))[0]}", C_RED)
             messagebox.showerror("URL không hợp lệ", str(e))
             return
@@ -1724,6 +2094,10 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _process_transcript(self, url: str, video_id: str, mode: str, language: str):
         """Process transcript fetching (background thread)."""
         self._set_processing(True, button="transcript")
+        self._show_output_loading(
+            "Đang lấy transcript",
+            "Nội dung transcript sẽ hiện ở đây ngay khi lấy xong.",
+        )
 
         try:
             segments = None
@@ -1759,23 +2133,33 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                     "mode": used_mode,
                     "date": get_current_date(),
                     "title": f"YouTube Video {video_id}",
+                    "channel": "",
                 }
+
+                show_ts = self.show_timestamps_var.get()
+                formatted = format_transcript_text(segments, include_timestamps=show_ts)
+                self._set_output(formatted)
+                self._set_status(
+                    f"✅ Đã hiển thị {len(segments)} segments — đang lấy tiêu đề video...",
+                    C_ACCENT_2,
+                )
 
                 try:
                     info = get_video_info(url, self.cookie_browser_var.get())
                     if info.get("title") and info["title"] != "Unknown":
                         self.current_metadata["title"] = info["title"]
+                    if info.get("channel") and info["channel"] != "Unknown":
+                        self.current_metadata["channel"] = info["channel"]
                 except Exception:
                     pass
-
-                show_ts = self.show_timestamps_var.get()
-                formatted = format_transcript_text(segments, include_timestamps=show_ts)
-                self._set_output(formatted)
 
                 self._set_status(
                     f"🎉 Hoàn tất! {len(segments)} segments — {used_mode}",
                     C_ACCENT_2,
                 )
+            else:
+                self._set_output("")
+                self._set_status("⚠️ Không có nội dung transcript để hiển thị", C_ORANGE)
 
         except TranscriptNotFoundError as e:
             self._set_status(f"❌ {str(e).split(chr(10))[0]}", C_RED)
@@ -1838,7 +2222,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _on_copy(self):
         """Copy transcript to clipboard."""
         text = self.output_text.get("1.0", "end").strip()
-        if not text or text.startswith("Chào bạn"):
+        if not text or text.startswith("Chưa có transcript"):
             self._set_status("⚠️ Không có transcript để copy", C_ORANGE)
             return
 
@@ -1860,14 +2244,124 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     def _on_save_srt(self):
         self._save_file("srt", export_srt)
 
+    def _build_export_metadata(self, ext: str) -> dict:
+        metadata = dict(self.current_metadata or {})
+        if ext == "md":
+            metadata["markdown_mode"] = self.settings.get("markdown_mode", "Clean Transcript")
+            metadata["include_timestamps"] = bool(self.show_timestamps_var.get())
+        return metadata
+
+    @staticmethod
+    def _slug_filename_part(value: str) -> str:
+        """Create a compact filename token while preserving readable Unicode text."""
+        safe = sanitize_filename(value)
+        safe = re.sub(r"\s+", "-", safe)
+        safe = re.sub(r"-{2,}", "-", safe)
+        return safe.strip("-_. ") or "untitled"
+
+    def _build_export_filename(self, ext: str, metadata: dict) -> str:
+        date_value = str(metadata.get("date", get_current_date()) or get_current_date())
+        values = {
+            "date": date_value,
+            "date_compact": re.sub(r"\D", "", date_value) or get_current_date().replace("-", ""),
+            "title": metadata.get("title", "transcript"),
+            "video_id": metadata.get("video_id", ""),
+            "channel": metadata.get("channel", ""),
+            "language": metadata.get("language", ""),
+        }
+        pattern = self.settings.get("filename_pattern", "{date_compact}_{title}") if ext == "md" else "{title}"
+
+        if ext == "md":
+            values = {key: self._slug_filename_part(str(value)) for key, value in values.items()}
+        else:
+            values = {key: str(value) for key, value in values.items()}
+
+        try:
+            filename = pattern.format_map(values)
+        except (KeyError, ValueError):
+            filename = f"{values['date_compact']}_{values['title']}" if ext == "md" else values["title"]
+
+        return f"{sanitize_filename(filename)}.{ext}"
+
+    def _get_initial_export_dir(self) -> Path:
+        last_dir = self.settings.get("last_export_dir", "")
+        if last_dir:
+            path = Path(last_dir)
+            if path.exists():
+                return path
+        return get_base_dir() / "exports"
+
+    def _get_obsidian_export_dir(self) -> Path | None:
+        vault = str(self.settings.get("obsidian_vault_path", "")).strip()
+        if not vault:
+            selected = filedialog.askdirectory(
+                title="Chọn Obsidian vault hoặc folder lưu Markdown",
+                initialdir=str(self._get_initial_export_dir()),
+            )
+            if not selected:
+                return None
+            vault = selected
+            self.settings["obsidian_vault_path"] = selected
+            try:
+                self.settings = save_settings(self.settings)
+            except Exception:
+                pass
+
+        vault_path = Path(vault)
+        if not vault_path.exists():
+            selected = filedialog.askdirectory(
+                title="Vault path không tồn tại. Chọn lại folder lưu Markdown",
+                initialdir=str(self._get_initial_export_dir()),
+            )
+            if not selected:
+                return None
+            vault_path = Path(selected)
+            self.settings["obsidian_vault_path"] = selected
+            try:
+                self.settings = save_settings(self.settings)
+            except Exception:
+                pass
+
+        subfolder = str(self.settings.get("obsidian_subfolder", "")).strip().strip("/\\")
+        return vault_path / subfolder if subfolder else vault_path
+
+    def _unique_export_path(self, path: Path) -> Path:
+        if not path.exists():
+            return path
+
+        stem = path.stem
+        suffix = path.suffix
+        parent = path.parent
+        index = 2
+        while True:
+            candidate = parent / f"{stem}_{index}{suffix}"
+            if not candidate.exists():
+                return candidate
+            index += 1
+
+    def _remember_export_dir(self, file_path: str) -> None:
+        self.settings["last_export_dir"] = str(Path(file_path).parent)
+        try:
+            self.settings = save_settings(self.settings)
+        except Exception:
+            pass
+
+    def _open_exported_file(self, file_path: str) -> None:
+        if not self.settings.get("auto_open_after_export", False):
+            return
+        try:
+            os.startfile(file_path)
+        except Exception as e:
+            print(f"Cannot open exported file: {e}")
+
     def _save_file(self, ext: str, export_func):
         """Generic save file handler."""
         if not self.current_segments:
             self._set_status("⚠️ Không có transcript để lưu", C_ORANGE)
             return
 
-        title = self.current_metadata.get("title", "transcript")
-        default_name = sanitize_filename(title)
+        metadata = self._build_export_metadata(ext)
+        default_name = self._build_export_filename(ext, metadata)
 
         type_names = {
             "txt": "Text Files",
@@ -1875,20 +2369,29 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             "srt": "SRT Subtitle Files",
         }
 
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=f".{ext}",
-            initialdir=str(get_base_dir() / "exports"),
-            initialfile=f"{default_name}.{ext}",
-            filetypes=[(type_names.get(ext, "Files"), f"*.{ext}"), ("All Files", "*.*")],
-            title=f"Save as .{ext.upper()}",
-        )
+        file_path = None
+        if ext == "md":
+            obsidian_dir = self._get_obsidian_export_dir()
+            if obsidian_dir:
+                file_path = str(self._unique_export_path(obsidian_dir / default_name))
+
+        if not file_path:
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=f".{ext}",
+                initialdir=str(self._get_initial_export_dir()),
+                initialfile=default_name,
+                filetypes=[(type_names.get(ext, "Files"), f"*.{ext}"), ("All Files", "*.*")],
+                title=f"Save as .{ext.upper()}",
+            )
 
         if not file_path:
             return
 
         try:
-            export_func(self.current_segments, file_path, self.current_metadata)
+            export_func(self.current_segments, file_path, metadata)
+            self._remember_export_dir(file_path)
             self._set_status(f"💾 Đã lưu: {Path(file_path).name}", C_ACCENT_2)
+            self._open_exported_file(file_path)
         except PermissionError:
             self._set_status("❌ Không có quyền ghi file", C_RED)
             messagebox.showerror("Lỗi", "Không có quyền ghi vào thư mục này.")
@@ -1902,7 +2405,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.current_metadata = {}
         self.word_count_label.configure(text="")
         self._show_placeholder()
-        self._set_status("✅ Ready — Paste a YouTube URL to get started!", C_ACCENT_2)
+        self._set_status("✅ Sẵn sàng — dán YouTube URL để bắt đầu", C_ACCENT_2)
 
     # ═════════════════════════════════════════════════════════════
     #  UTILITIES

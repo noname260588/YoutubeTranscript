@@ -23,7 +23,9 @@
 | ⌨️ **Global Hotkey** | Bôi đen link YouTube và nhấn `Ctrl + Shift + C` để đưa link vào app |
 | 🍪 **Browser Cookies** | Tự retry bằng cookies Edge/Chrome/Firefox khi YouTube yêu cầu đăng nhập |
 | 💾 **Export TXT** | Xuất plain text với timestamp |
-| 📝 **Export Markdown** | Xuất Obsidian-friendly markdown với metadata |
+| 📝 **Export Markdown** | Xuất Obsidian-friendly Markdown với frontmatter và clean mode |
+| 🗂️ **Obsidian Direct Export** | Lưu Markdown thẳng vào vault/subfolder đã cấu hình |
+| ⚙️ **Persistent Settings** | Nhớ folder export, language, mode, Whisper model và timestamp toggle |
 | 🎬 **Export SRT** | Xuất phụ đề chuẩn SRT |
 | 🌐 **Multi-language** | Hỗ trợ Vietnamese, English, Japanese, Chinese |
 | 🌙 **Dark Mode UI** | Giao diện dark hiện đại với CustomTkinter |
@@ -149,21 +151,49 @@ Language: vi
 
 ### Markdown (Obsidian-friendly)
 ```markdown
+---
+type: youtube-note
+title: "Video Title"
+source: "https://youtube.com/watch?v=..."
+language: "vi"
+created: "2026-05-21"
+mode: "Clean Transcript"
+tags:
+  - youtube
+  - transcript
+---
+
 # Video Title
 
-> Source: https://youtube.com/watch?v=...
-> Date: 2026-05-20
-> Language: vi
-> Mode: YouTube Transcript
+## Summary
+
+## Key Ideas
+
+## Quotes
 
 ## Transcript
 
-[00:00:01] Nội dung...
+[00:00:01] Nội dung transcript...
 
 ## My Notes
-
-<!-- Add your notes here -->
 ```
+
+Markdown export hỗ trợ 3 mode trong Settings:
+
+- **Raw Transcript**: giữ transcript gần nguyên bản.
+- **Clean Transcript**: rule-based, chuẩn hóa whitespace, gộp segment ngắn, bỏ dòng lặp và chia đoạn dễ đọc.
+- **Learning Notes**: template Obsidian với các heading học tập và transcript đã clean.
+
+### Obsidian Direct Export
+
+Mở **Settings** để cấu hình:
+
+- `Obsidian Vault Path`: vault hoặc folder Markdown đích.
+- `Default subfolder`: mặc định `Resources/YouTube`.
+- `Filename pattern`: mặc định `{date_compact}_{title}` để tạo file kiểu `20260521_video-title.md`.
+- `Auto open file after export`: mở file Markdown sau khi lưu.
+
+Nếu chưa cấu hình vault, khi bấm **Save MD** app sẽ hỏi folder và nhớ lại cho lần sau.
 
 ### SRT
 ```
@@ -216,11 +246,11 @@ https://m.youtube.com/watch?v=VIDEO_ID
 
 ## 🛣️ Roadmap
 
-- [ ] Auto detect video title
-- [ ] Remove repeated/filler lines
-- [ ] Split transcript by paragraph
-- [ ] Save directly to Obsidian vault
-- [ ] Remember last export folder
+- [x] Auto detect video title
+- [x] Remove repeated/filler lines (rule-based Markdown clean mode)
+- [x] Split transcript by paragraph (rule-based Markdown clean mode)
+- [x] Save directly to Obsidian vault
+- [x] Remember last export folder
 - [ ] Dark/Light theme toggle
 - [ ] Drag & drop local audio file
 - [ ] Auto summarize with AI
