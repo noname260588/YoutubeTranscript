@@ -12,6 +12,28 @@ tags:
 
 # How to Learn Faster with YouTube
 
+## Video Info
+
+- **Source:** https://youtube.com/watch?v=example12345
+- **Channel:** Example Learning
+- **Upload date:** 2026-05-21
+- **Duration:** 8:42
+- **Tags:** youtube, transcript, learning
+
+## Description
+
+A short example description for a YouTube learning video.
+
+00:00 Intro
+00:42 Capture the transcript
+01:25 Export to Obsidian
+
+## Chapters
+
+- 00:00 Intro
+- 00:42 Capture the transcript
+- 01:25 Export to Obsidian
+
 ## Summary
 
 ## Key Ideas

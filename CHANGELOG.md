@@ -10,11 +10,16 @@
 - Markdown export modes: Raw Transcript, Clean Transcript, and Learning Notes.
 - Rule-based clean transcript formatting for Markdown export.
 - Obsidian-ready Markdown frontmatter and note sections.
+- YouTube metadata extraction with yt-dlp in metadata-only mode.
+- Optional Markdown sections for Video Info, Description, and Chapters.
+- Offline Prompt Template Generator with nine built-in prompt types.
+- Prompt rendering service backed by `prompt_templates.json`.
 - Sample exported Markdown note under `samples/`.
 
 ### Changed
 - Markdown export now uses v1.0 frontmatter fields: `type`, `title`, `source`, `language`, `created`, `mode`, and `tags`.
 - Main window layout is more compact while keeping transcript actions visible.
+- PyInstaller build now bundles `prompt_templates.json`.
 
 ### Verified
 - `python app.py` launches successfully.

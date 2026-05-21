@@ -5,6 +5,10 @@ Handles exporting transcripts to TXT, Markdown, and SRT formats.
 
 import re
 from pathlib import Path
+from services.youtube_metadata_service import (
+    clean_youtube_description,
+    extract_chapters_from_description,
+)
 from utils import format_timestamp, format_srt_timestamp, get_current_date
 
 MARKDOWN_MODES = ["Raw Transcript", "Clean Transcript", "Learning Notes"]
@@ -180,6 +184,99 @@ def _format_clean_transcript(segments: list[dict], include_timestamps: bool = Tr
     return _dedupe_repeated_lines(lines)
 
 
+def format_clean_transcript_text(segments: list[dict], include_timestamps: bool = False) -> str:
+    """Return clean transcript text for display, prompts, or Markdown export."""
+    return "\n".join(_format_clean_transcript(segments, include_timestamps=include_timestamps))
+
+
+def _format_duration(seconds: int | float | str) -> str:
+    try:
+        total = int(float(seconds or 0))
+    except (TypeError, ValueError):
+        return ""
+    if total <= 0:
+        return ""
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
+def _format_upload_date(value: str) -> str:
+    value = str(value or "").strip()
+    if re.fullmatch(r"\d{8}", value):
+        return f"{value[:4]}-{value[4:6]}-{value[6:8]}"
+    return value
+
+
+def _append_video_info(lines: list[str], metadata: dict) -> None:
+    info_items = [
+        ("Source", metadata.get("webpage_url") or metadata.get("url")),
+        ("Channel", metadata.get("channel")),
+        ("Uploader", metadata.get("uploader")),
+        ("Upload date", _format_upload_date(metadata.get("upload_date", ""))),
+        ("Duration", _format_duration(metadata.get("duration", 0))),
+        ("Thumbnail", metadata.get("thumbnail")),
+    ]
+
+    tags = metadata.get("tags") or []
+    categories = metadata.get("categories") or []
+    if tags:
+        info_items.append(("Tags", ", ".join(str(tag) for tag in tags[:20])))
+    if categories:
+        info_items.append(("Categories", ", ".join(str(category) for category in categories)))
+
+    rendered = [(label, value) for label, value in info_items if value]
+    if not rendered:
+        return
+
+    lines.append("## Video Info")
+    lines.append("")
+    for label, value in rendered:
+        lines.append(f"- **{label}:** {value}")
+    lines.append("")
+
+
+def _append_description(lines: list[str], metadata: dict) -> None:
+    description = metadata.get("description", "")
+    if not description:
+        return
+    if metadata.get("clean_description", True):
+        description = metadata.get("clean_description_text") or clean_youtube_description(description)
+
+    if not description:
+        return
+
+    lines.append("## Description")
+    lines.append("")
+    lines.extend(description.splitlines())
+    lines.append("")
+
+
+def _append_chapters(lines: list[str], metadata: dict) -> None:
+    chapters = metadata.get("chapters")
+    if chapters is None:
+        chapters = extract_chapters_from_description(metadata.get("description", ""))
+    if not chapters:
+        return
+
+    lines.append("## Chapters")
+    lines.append("")
+    for chapter in chapters:
+        if isinstance(chapter, dict):
+            timestamp = chapter.get("timestamp", "")
+            title = chapter.get("title", "")
+            seconds = chapter.get("seconds")
+            if not timestamp and seconds is not None:
+                timestamp = format_timestamp(seconds).strip("[]")
+            lines.append(f"- {timestamp} {title}".strip())
+        else:
+            lines.append(f"- {chapter}")
+    lines.append("")
+
+
 def export_markdown(segments: list[dict], output_path: str, metadata: dict = None) -> str:
     """
     Export transcript segments to an Obsidian-friendly Markdown file.
@@ -215,6 +312,16 @@ def export_markdown(segments: list[dict], output_path: str, metadata: dict = Non
     lines.append("")
     lines.append(f"# {title}")
     lines.append("")
+
+    if metadata.get("include_metadata", False):
+        _append_video_info(lines, metadata)
+
+    if metadata.get("include_video_description", False):
+        _append_description(lines, metadata)
+
+    if metadata.get("extract_chapters", False):
+        _append_chapters(lines, metadata)
+
     lines.append("## Summary")
     lines.append("")
     if mode == "Learning Notes":

@@ -32,7 +32,6 @@ from audio_service import (
     download_audio,
     AudioDownloadCancelledError,
     AudioDownloadError,
-    get_video_info,
 )
 from video_service import download_video, VideoDownloadCancelledError, VideoDownloadError
 from whisper_service import transcribe_audio, WhisperTranscriptionError
@@ -41,9 +40,20 @@ from export_service import (
     export_txt,
     export_markdown,
     export_srt,
+    format_clean_transcript_text,
     format_transcript_text,
 )
 from settings_service import load_settings, save_settings
+from services.youtube_metadata_service import (
+    clean_youtube_description,
+    extract_chapters_from_description,
+    get_youtube_metadata,
+)
+from services.prompt_template_service import (
+    get_template,
+    list_templates,
+    render_prompt,
+)
 
 
 # ─── App Constants ───────────────────────────────────────────────
@@ -111,6 +121,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.is_processing = False
         self.cancel_event = threading.Event()
         self.settings = load_settings()
+        self.prompt_templates = self._load_prompt_templates()
 
         # ─── Ensure Directories ──────────────────────────────────
         ensure_dirs()
@@ -429,6 +440,14 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
     #  UI BUILDING
     # ═════════════════════════════════════════════════════════════
 
+    def _load_prompt_templates(self) -> list[dict]:
+        """Load prompt template metadata for the UI."""
+        try:
+            return list_templates()
+        except Exception as e:
+            print(f"Cannot load prompt templates: {e}")
+            return []
+
     def _build_ui(self):
         """Build the complete UI layout."""
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -442,7 +461,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self._build_options_section(row=2)
         self._build_output_section(row=3)
         self._build_action_buttons(row=4)
-        self._build_status_bar(row=4)
+        self._build_prompt_section(row=4)
+        self._build_status_bar(row=5)
 
     def _build_header(self, row: int):
         """Header section."""
@@ -1218,6 +1238,130 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         self._sync_output_actions()
 
+    def _build_prompt_section(self, row: int):
+        """Prompt Template Generator section."""
+        self.prompt_card = ctk.CTkFrame(
+            self.main_frame,
+            fg_color=C_BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=C_BORDER,
+        )
+        self.prompt_card.grid(row=row, column=0, sticky="ew", pady=(0, 6))
+        self.prompt_card.columnconfigure(2, weight=1)
+
+        ctk.CTkLabel(
+            self.prompt_card,
+            text="🧩 Prompt Templates",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=C_TEXT_DIM,
+        ).grid(row=0, column=0, sticky="w", padx=12, pady=(7, 2))
+
+        template_names = [template["name"] for template in self.prompt_templates] or ["No templates"]
+        self.prompt_template_name_to_id = {
+            template["name"]: template["id"] for template in self.prompt_templates
+        }
+        self.prompt_template_var = ctk.StringVar(value=template_names[0])
+        self.prompt_template_dropdown = ctk.CTkOptionMenu(
+            self.prompt_card,
+            variable=self.prompt_template_var,
+            values=template_names,
+            fg_color=C_BG_INPUT,
+            button_color=C_BORDER,
+            button_hover_color=C_ACCENT,
+            dropdown_fg_color=C_BG_CARD,
+            dropdown_hover_color=C_ACCENT,
+            command=lambda _choice: self._on_prompt_template_selected(),
+            width=190,
+        )
+        self.prompt_template_dropdown.grid(row=1, column=0, sticky="ew", padx=(12, 6), pady=(0, 6))
+
+        self.prompt_transcript_mode_var = ctk.StringVar(value="Use Clean Transcript")
+        self.prompt_transcript_mode_dropdown = ctk.CTkOptionMenu(
+            self.prompt_card,
+            variable=self.prompt_transcript_mode_var,
+            values=["Use Clean Transcript", "Use Raw Transcript", "Use Transcript with timestamps"],
+            fg_color=C_BG_INPUT,
+            button_color=C_BORDER,
+            button_hover_color=C_ACCENT,
+            dropdown_fg_color=C_BG_CARD,
+            dropdown_hover_color=C_ACCENT,
+            width=190,
+        )
+        self.prompt_transcript_mode_dropdown.grid(row=1, column=1, sticky="w", padx=(0, 6), pady=(0, 6))
+
+        self.prompt_description_label = ctk.CTkLabel(
+            self.prompt_card,
+            text="",
+            font=ctk.CTkFont(size=11),
+            text_color=C_TEXT_DIM,
+            anchor="w",
+            wraplength=520,
+        )
+        self.prompt_description_label.grid(row=1, column=2, sticky="ew", padx=(0, 6), pady=(0, 6))
+
+        button_frame = ctk.CTkFrame(self.prompt_card, fg_color="transparent")
+        button_frame.grid(row=1, column=3, sticky="e", padx=(0, 12), pady=(0, 6))
+
+        self.generate_prompt_btn = ctk.CTkButton(
+            button_frame,
+            text="Generate Prompt",
+            width=118,
+            height=30,
+            command=self._on_generate_prompt,
+        )
+        self.generate_prompt_btn.pack(side="left", padx=(0, 6))
+
+        self.copy_prompt_only_btn = ctk.CTkButton(
+            button_frame,
+            text="Copy Prompt Only",
+            width=126,
+            height=30,
+            fg_color=C_BG_ELEVATED,
+            hover_color=C_BORDER,
+            command=self._on_copy_prompt_only,
+        )
+        self.copy_prompt_only_btn.pack(side="left", padx=(0, 6))
+
+        self.copy_prompt_transcript_btn = ctk.CTkButton(
+            button_frame,
+            text="Copy + Transcript",
+            width=128,
+            height=30,
+            fg_color=C_PURPLE,
+            hover_color=self._lighten_color(C_PURPLE),
+            command=self._on_copy_prompt_with_transcript,
+        )
+        self.copy_prompt_transcript_btn.pack(side="left")
+
+        self.prompt_preview_text = ctk.CTkTextbox(
+            self.prompt_card,
+            font=ctk.CTkFont(family="Consolas", size=11),
+            fg_color=C_BG_INPUT,
+            text_color=C_TEXT,
+            border_width=0,
+            corner_radius=8,
+            wrap="word",
+            height=82,
+            activate_scrollbars=True,
+        )
+        self.prompt_preview_text.grid(row=2, column=0, columnspan=4, sticky="ew", padx=12, pady=(0, 10))
+
+        self.prompt_controls = [
+            self.prompt_template_dropdown,
+            self.prompt_transcript_mode_dropdown,
+            self.generate_prompt_btn,
+            self.copy_prompt_only_btn,
+            self.copy_prompt_transcript_btn,
+        ]
+
+        if not self.prompt_templates:
+            for control in self.prompt_controls:
+                control.configure(state="disabled")
+            self.prompt_description_label.configure(text="prompt_templates.json không khả dụng.")
+        else:
+            self._on_prompt_template_selected()
+
     def _build_status_bar(self, row: int):
         """Status bar."""
         self.status_frame = ctk.CTkFrame(
@@ -1355,6 +1499,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             self.cookie_browser_dropdown,
             *self.action_buttons,
         ]
+        if getattr(self, "prompt_templates", []):
+            controls.extend(getattr(self, "prompt_controls", []))
 
         for control in controls:
             try:
@@ -1490,13 +1636,13 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         """Show app settings for Obsidian and Markdown export."""
         settings_win = ctk.CTkToplevel(self)
         settings_win.title("Settings")
-        settings_win.geometry("620x430")
+        settings_win.geometry("620x540")
         settings_win.resizable(False, False)
         settings_win.attributes("-topmost", True)
 
         self.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() - 620) // 2
-        y = self.winfo_y() + (self.winfo_height() - 430) // 2
+        y = self.winfo_y() + (self.winfo_height() - 540) // 2
         settings_win.geometry(f"+{x}+{y}")
 
         settings_win.grid_columnconfigure(0, weight=1)
@@ -1523,6 +1669,10 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         pattern_var = ctk.StringVar(value=str(self.settings.get("filename_pattern", "{date_compact}_{title}")))
         markdown_mode_var = ctk.StringVar(value=str(self.settings.get("markdown_mode", "Clean Transcript")))
         auto_open_var = ctk.BooleanVar(value=bool(self.settings.get("auto_open_after_export", False)))
+        include_metadata_var = ctk.BooleanVar(value=bool(self.settings.get("include_metadata", True)))
+        include_description_var = ctk.BooleanVar(value=bool(self.settings.get("include_video_description", False)))
+        clean_description_var = ctk.BooleanVar(value=bool(self.settings.get("clean_description", True)))
+        extract_chapters_var = ctk.BooleanVar(value=bool(self.settings.get("extract_chapters", True)))
 
         def add_label(text: str, row: int):
             ctk.CTkLabel(
@@ -1590,8 +1740,32 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         auto_open_switch.grid(row=9, column=2, sticky="w", padx=(0, 16), pady=(0, 12))
 
+        add_label("Markdown sections", 10)
+        sections_frame = ctk.CTkFrame(container, fg_color="transparent")
+        sections_frame.grid(row=11, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 12))
+        sections_frame.columnconfigure(0, weight=1)
+        sections_frame.columnconfigure(1, weight=1)
+
+        section_switches = [
+            ("Include metadata", include_metadata_var),
+            ("Include video description", include_description_var),
+            ("Clean description", clean_description_var),
+            ("Extract chapters", extract_chapters_var),
+        ]
+        for index, (label, variable) in enumerate(section_switches):
+            switch = ctk.CTkSwitch(
+                sections_frame,
+                text=label,
+                variable=variable,
+                fg_color=C_BORDER,
+                progress_color=C_ACCENT,
+                button_color=C_TEXT,
+                button_hover_color=C_ACCENT_HOVER,
+            )
+            switch.grid(row=index // 2, column=index % 2, sticky="w", padx=(0, 12), pady=3)
+
         button_row = ctk.CTkFrame(container, fg_color="transparent")
-        button_row.grid(row=10, column=0, columnspan=3, sticky="ew", padx=16, pady=(4, 16))
+        button_row.grid(row=12, column=0, columnspan=3, sticky="ew", padx=16, pady=(4, 16))
         button_row.columnconfigure(0, weight=1)
 
         def save_dialog_settings():
@@ -1601,6 +1775,10 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 "filename_pattern": pattern_var.get().strip() or "{date_compact}_{title}",
                 "markdown_mode": markdown_mode_var.get(),
                 "auto_open_after_export": bool(auto_open_var.get()),
+                "include_metadata": bool(include_metadata_var.get()),
+                "include_video_description": bool(include_description_var.get()),
+                "clean_description": bool(clean_description_var.get()),
+                "extract_chapters": bool(extract_chapters_var.get()),
             })
             self.settings = save_settings(self.settings)
             self._set_status("✅ Đã lưu settings", C_ACCENT_2)
@@ -2140,16 +2318,34 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 formatted = format_transcript_text(segments, include_timestamps=show_ts)
                 self._set_output(formatted)
                 self._set_status(
-                    f"✅ Đã hiển thị {len(segments)} segments — đang lấy tiêu đề video...",
+                    f"✅ Đã hiển thị {len(segments)} segments — đang lấy metadata video...",
                     C_ACCENT_2,
                 )
 
                 try:
-                    info = get_video_info(url, self.cookie_browser_var.get())
-                    if info.get("title") and info["title"] != "Unknown":
-                        self.current_metadata["title"] = info["title"]
-                    if info.get("channel") and info["channel"] != "Unknown":
-                        self.current_metadata["channel"] = info["channel"]
+                    video_metadata = get_youtube_metadata(url)
+                    if video_metadata.get("id"):
+                        self.current_metadata["id"] = video_metadata["id"]
+                        self.current_metadata["video_id"] = video_metadata["id"]
+                    if video_metadata.get("title") and video_metadata["title"] != "Unknown":
+                        self.current_metadata["title"] = video_metadata["title"]
+                    for key in (
+                        "description",
+                        "channel",
+                        "channel_id",
+                        "uploader",
+                        "upload_date",
+                        "duration",
+                        "thumbnail",
+                        "webpage_url",
+                        "tags",
+                        "categories",
+                    ):
+                        self.current_metadata[key] = video_metadata.get(key, self.current_metadata.get(key, ""))
+
+                    description = self.current_metadata.get("description", "")
+                    self.current_metadata["clean_description_text"] = clean_youtube_description(description)
+                    self.current_metadata["chapters"] = extract_chapters_from_description(description)
                 except Exception:
                     pass
 
@@ -2219,6 +2415,153 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         return segments
 
+    def _get_selected_prompt_template_id(self) -> str | None:
+        """Return the selected prompt template id from the display name."""
+        template_var = getattr(self, "prompt_template_var", None)
+        template_name = template_var.get() if template_var else ""
+        return getattr(self, "prompt_template_name_to_id", {}).get(template_name)
+
+    def _on_prompt_template_selected(self):
+        """Refresh the template description when the user chooses a prompt type."""
+        template_id = self._get_selected_prompt_template_id()
+        if not template_id:
+            self.prompt_description_label.configure(text="")
+            return
+
+        try:
+            template = get_template(template_id)
+            self.prompt_description_label.configure(text=template.get("description", ""))
+        except Exception as e:
+            self.prompt_description_label.configure(text="Cannot load this template.")
+            self._set_status(f"Prompt template error: {e}", C_ORANGE)
+
+    def _format_prompt_chapters(self) -> str:
+        """Format metadata chapters for prompt context."""
+        metadata = self.current_metadata or {}
+        chapters = metadata.get("chapters")
+        if chapters is None:
+            chapters = extract_chapters_from_description(metadata.get("description", ""))
+        if not chapters:
+            return ""
+
+        lines = []
+        for chapter in chapters:
+            if isinstance(chapter, dict):
+                timestamp = str(chapter.get("timestamp", "") or "").strip()
+                title = str(chapter.get("title", "") or "").strip()
+                line = f"{timestamp} {title}".strip()
+                if line:
+                    lines.append(f"- {line}")
+            else:
+                text = str(chapter).strip()
+                if text:
+                    lines.append(f"- {text}")
+        return "\n".join(lines)
+
+    def _get_prompt_url(self) -> str:
+        metadata = self.current_metadata or {}
+        url = metadata.get("webpage_url") or metadata.get("url") or ""
+        if url:
+            return str(url)
+        try:
+            return self.url_entry.get().strip()
+        except Exception:
+            return ""
+
+    def _get_prompt_transcript_text(self) -> str:
+        """Return transcript text using the selected prompt transcript mode."""
+        if not self.current_segments:
+            return ""
+
+        mode = self.prompt_transcript_mode_var.get().lower()
+        if "timestamp" in mode:
+            return format_transcript_text(self.current_segments, include_timestamps=True)
+        if "raw" in mode:
+            return format_transcript_text(self.current_segments, include_timestamps=False)
+        return format_clean_transcript_text(self.current_segments, include_timestamps=False)
+
+    def _build_prompt_context(self, include_transcript: bool) -> dict:
+        """Build template variables from the current video metadata and transcript."""
+        metadata = self.current_metadata or {}
+        url = self._get_prompt_url()
+        description = metadata.get("clean_description_text")
+        if not description:
+            description = clean_youtube_description(metadata.get("description", ""))
+
+        title = str(metadata.get("title", "") or "").strip()
+        if not title and url:
+            video_id = extract_video_id(url)
+            title = f"YouTube Video {video_id}" if video_id else "YouTube Video"
+
+        return {
+            "VIDEO_TITLE": title,
+            "VIDEO_URL": url,
+            "CHANNEL_NAME": metadata.get("channel") or metadata.get("uploader") or "",
+            "DESCRIPTION": description or "",
+            "CHAPTERS": self._format_prompt_chapters(),
+            "TRANSCRIPT": self._get_prompt_transcript_text() if include_transcript else "",
+        }
+
+    def _set_prompt_preview(self, text: str) -> None:
+        if not hasattr(self, "prompt_preview_text"):
+            return
+        self.prompt_preview_text.delete("1.0", "end")
+        self.prompt_preview_text.insert("1.0", text)
+        self.prompt_preview_text.see("1.0")
+
+    def _render_selected_prompt(self, include_transcript: bool) -> str:
+        template_id = self._get_selected_prompt_template_id()
+        if not template_id:
+            self._set_status("No prompt template selected.", C_ORANGE)
+            return ""
+
+        try:
+            context = self._build_prompt_context(include_transcript=include_transcript)
+            prompt = render_prompt(template_id, context, include_transcript=include_transcript)
+        except Exception as e:
+            self._set_status(f"Cannot render prompt: {e}", C_RED)
+            return ""
+
+        self._set_prompt_preview(prompt)
+        return prompt
+
+    def _copy_text_to_clipboard(self, text: str) -> None:
+        try:
+            pyperclip.copy(text)
+        except Exception:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.update()
+
+    def _on_generate_prompt(self):
+        """Render a prompt preview, using transcript text when available."""
+        prompt = self._render_selected_prompt(include_transcript=bool(self.current_segments))
+        if not prompt:
+            return
+        if self.current_segments:
+            self._set_status("Prompt generated with current transcript.", C_ACCENT_2)
+        else:
+            self._set_status("Prompt generated. Fetch transcript to insert transcript content.", C_ORANGE)
+
+    def _on_copy_prompt_only(self):
+        """Copy the rendered prompt while keeping the transcript placeholder."""
+        prompt = self._render_selected_prompt(include_transcript=False)
+        if not prompt:
+            return
+        self._copy_text_to_clipboard(prompt)
+        self._set_status("Prompt copied. {TRANSCRIPT} placeholder kept.", C_ACCENT_2)
+
+    def _on_copy_prompt_with_transcript(self):
+        """Copy the rendered prompt with the current transcript inserted."""
+        if not self.current_segments:
+            self._set_status("No transcript available for prompt copy.", C_ORANGE)
+            return
+        prompt = self._render_selected_prompt(include_transcript=True)
+        if not prompt:
+            return
+        self._copy_text_to_clipboard(prompt)
+        self._set_status("Prompt and transcript copied to clipboard.", C_ACCENT_2)
+
     def _on_copy(self):
         """Copy transcript to clipboard."""
         text = self.output_text.get("1.0", "end").strip()
@@ -2249,6 +2592,10 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         if ext == "md":
             metadata["markdown_mode"] = self.settings.get("markdown_mode", "Clean Transcript")
             metadata["include_timestamps"] = bool(self.show_timestamps_var.get())
+            metadata["include_metadata"] = bool(self.settings.get("include_metadata", True))
+            metadata["include_video_description"] = bool(self.settings.get("include_video_description", False))
+            metadata["clean_description"] = bool(self.settings.get("clean_description", True))
+            metadata["extract_chapters"] = bool(self.settings.get("extract_chapters", True))
         return metadata
 
     @staticmethod
@@ -2405,6 +2752,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.current_metadata = {}
         self.word_count_label.configure(text="")
         self._show_placeholder()
+        if hasattr(self, "prompt_preview_text"):
+            self._set_prompt_preview("")
         self._set_status("✅ Sẵn sàng — dán YouTube URL để bắt đầu", C_ACCENT_2)
 
     # ═════════════════════════════════════════════════════════════

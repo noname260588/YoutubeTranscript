@@ -26,6 +26,8 @@
 | 📝 **Export Markdown** | Xuất Obsidian-friendly Markdown với frontmatter và clean mode |
 | 🗂️ **Obsidian Direct Export** | Lưu Markdown thẳng vào vault/subfolder đã cấu hình |
 | ⚙️ **Persistent Settings** | Nhớ folder export, language, mode, Whisper model và timestamp toggle |
+| 🔎 **YouTube Metadata** | Lấy title, channel, description, thumbnail, tags, categories bằng yt-dlp không download |
+| 🧩 **Prompt Template Generator** | Tạo prompt offline từ transcript và metadata để copy sang AI/chat tool |
 | 🎬 **Export SRT** | Xuất phụ đề chuẩn SRT |
 | 🌐 **Multi-language** | Hỗ trợ Vietnamese, English, Japanese, Chinese |
 | 🌙 **Dark Mode UI** | Giao diện dark hiện đại với CustomTkinter |
@@ -86,6 +88,10 @@ YoutubeTranscript/
 ├── video_service.py         # Download video MP4 hoặc audio M4A bằng yt-dlp
 ├── whisper_service.py       # Speech-to-text bằng faster-whisper
 ├── export_service.py        # Xuất file TXT, Markdown, SRT
+├── prompt_templates.json    # Prompt templates offline
+├── services/                # Metadata và prompt template services
+│   ├── prompt_template_service.py
+│   └── youtube_metadata_service.py
 ├── utils.py                 # Utility: parse URL, format timestamp, sanitize filename
 ├── requirements.txt         # Python dependencies
 ├── build.bat                # Build portable EXE bằng PyInstaller
@@ -137,6 +143,32 @@ YoutubeTranscript/
 
 ---
 
+## 🧩 Prompt Template Generator
+
+Prompt Template Generator hoạt động hoàn toàn offline, không gọi AI API. App chỉ dựng sẵn prompt từ transcript hiện tại và metadata YouTube để bạn copy sang công cụ AI/chat khác.
+
+Luồng sử dụng:
+
+1. Lấy transcript như bình thường.
+2. Chọn prompt type: Key Ideas, Lessons Learned, Obsidian Note, Facebook Post, Viral Caption, Slide Deck, Flashcards, Action Checklist hoặc Product Ideas.
+3. Chọn transcript mode cho prompt: Clean Transcript, Raw Transcript hoặc Transcript with timestamps.
+4. Bấm **Generate Prompt** để xem preview.
+5. Bấm **Copy Prompt Only** nếu muốn giữ placeholder `{TRANSCRIPT}`.
+6. Bấm **Copy Prompt + Transcript** nếu muốn chèn transcript hiện tại vào prompt.
+
+Template có thể chỉnh trực tiếp trong `prompt_templates.json`. Các biến được hỗ trợ:
+
+```text
+{VIDEO_TITLE}
+{VIDEO_URL}
+{CHANNEL_NAME}
+{DESCRIPTION}
+{CHAPTERS}
+{TRANSCRIPT}
+```
+
+---
+
 ## 📤 Export Formats
 
 ### TXT
@@ -183,6 +215,13 @@ Markdown export hỗ trợ 3 mode trong Settings:
 - **Raw Transcript**: giữ transcript gần nguyên bản.
 - **Clean Transcript**: rule-based, chuẩn hóa whitespace, gộp segment ngắn, bỏ dòng lặp và chia đoạn dễ đọc.
 - **Learning Notes**: template Obsidian với các heading học tập và transcript đã clean.
+
+Markdown export có thể bật thêm trong Settings:
+
+- **Include metadata**: thêm `## Video Info`.
+- **Include video description**: thêm `## Description`.
+- **Clean description**: chuẩn hóa whitespace/dòng trống trong description.
+- **Extract chapters**: đọc timestamp trong description và thêm `## Chapters`.
 
 ### Obsidian Direct Export
 

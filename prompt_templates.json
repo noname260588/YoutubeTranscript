@@ -1,0 +1,56 @@
+[
+  {
+    "id": "key_ideas",
+    "name": "Key Ideas",
+    "description": "Extract the strongest ideas and explain why they matter.",
+    "template": "You are analyzing a YouTube transcript.\n\nVideo: {VIDEO_TITLE}\nURL: {VIDEO_URL}\nChannel: {CHANNEL_NAME}\n\nTask:\nExtract the key ideas from this video. For each idea, include:\n- A concise title\n- A clear explanation\n- Why it matters\n- Any useful timestamp or chapter reference if available\n\nChapters:\n{CHAPTERS}\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "lessons_learned",
+    "name": "Lessons Learned",
+    "description": "Turn the video into practical lessons and takeaways.",
+    "template": "Video: {VIDEO_TITLE}\nSource: {VIDEO_URL}\nChannel: {CHANNEL_NAME}\n\nCreate a lessons-learned brief from this transcript.\n\nFormat:\n1. Main lesson\n2. Supporting lessons\n3. Mistakes to avoid\n4. Practical examples\n5. One-sentence takeaway\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "obsidian_note",
+    "name": "Obsidian Note",
+    "description": "Generate a structured PKM note for Obsidian.",
+    "template": "Create an Obsidian-ready note from this YouTube video.\n\nMetadata:\n- Title: {VIDEO_TITLE}\n- Source: {VIDEO_URL}\n- Channel: {CHANNEL_NAME}\n\nUse this structure:\n# {VIDEO_TITLE}\n\n## Summary\n\n## Key Ideas\n\n## Quotes\n\n## Links / References\n\n## Transcript Insights\n\n## My Notes\n\nDescription:\n{DESCRIPTION}\n\nChapters:\n{CHAPTERS}\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "facebook_post",
+    "name": "Facebook Post",
+    "description": "Convert the video into a readable Facebook post.",
+    "template": "Write a Facebook post based on this YouTube video.\n\nVideo title: {VIDEO_TITLE}\nSource: {VIDEO_URL}\n\nRequirements:\n- Hook in the first 2 lines\n- Clear paragraph breaks\n- Practical insights from the video\n- Friendly but not exaggerated tone\n- End with a discussion question\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "viral_caption",
+    "name": "Viral Caption",
+    "description": "Create short-form captions and hooks for social media.",
+    "template": "Create viral short-form captions from this video.\n\nVideo: {VIDEO_TITLE}\nChannel: {CHANNEL_NAME}\n\nOutput:\n- 10 short hooks\n- 5 captions under 180 characters\n- 5 punchy one-liners\n- 5 hashtag sets\n\nKeep it accurate to the transcript.\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "slide_deck",
+    "name": "Slide Deck",
+    "description": "Turn the transcript into a slide deck outline.",
+    "template": "Create a slide deck outline from this YouTube video.\n\nTitle: {VIDEO_TITLE}\nURL: {VIDEO_URL}\n\nOutput 10-12 slides. For each slide include:\n- Slide title\n- Main point\n- Supporting bullets\n- Suggested visual\n- Speaker notes\n\nChapters:\n{CHAPTERS}\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "flashcards",
+    "name": "Flashcards",
+    "description": "Generate study flashcards from the transcript.",
+    "template": "Create study flashcards from this video transcript.\n\nVideo: {VIDEO_TITLE}\n\nFormat each card as:\nQ: ...\nA: ...\n\nInclude:\n- Definitions\n- Key ideas\n- Examples\n- Common mistakes\n- Application questions\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "action_checklist",
+    "name": "Action Checklist",
+    "description": "Extract concrete next actions from the video.",
+    "template": "Turn this YouTube video into an action checklist.\n\nVideo: {VIDEO_TITLE}\nSource: {VIDEO_URL}\n\nOutput:\n- Quick summary\n- Step-by-step checklist\n- Tools/resources mentioned\n- What to do today\n- What to review later\n\nTranscript:\n{TRANSCRIPT}"
+  },
+  {
+    "id": "product_ideas",
+    "name": "Product Ideas",
+    "description": "Find product, feature, or business ideas from the content.",
+    "template": "Analyze this YouTube transcript for product opportunities.\n\nVideo: {VIDEO_TITLE}\nChannel: {CHANNEL_NAME}\n\nOutput:\n- Problems mentioned or implied\n- Potential users\n- Product ideas\n- Feature ideas\n- Monetization angles\n- Risks or assumptions\n- Best 3 ideas to validate first\n\nTranscript:\n{TRANSCRIPT}"
+  }
+]

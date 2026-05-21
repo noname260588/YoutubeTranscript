@@ -20,6 +20,10 @@ DEFAULT_SETTINGS = {
     "selected_mode": "Auto",
     "selected_whisper_model": "small",
     "show_timestamps": True,
+    "include_metadata": True,
+    "include_video_description": False,
+    "clean_description": True,
+    "extract_chapters": True,
 }
 
 

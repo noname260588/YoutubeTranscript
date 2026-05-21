@@ -61,6 +61,7 @@ pyinstaller --noconsole ^
     --add-data "icon.ico;." ^
     --add-data "author.png;." ^
     --add-data "help.png;." ^
+    --add-data "prompt_templates.json;." ^
     --add-data "ffmpeg;ffmpeg" ^
     --hidden-import customtkinter ^
     --hidden-import faster_whisper ^
