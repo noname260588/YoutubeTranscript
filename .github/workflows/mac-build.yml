@@ -1,0 +1,49 @@
+name: Build macOS App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build macOS Executable
+        run: |
+          # Use colon (:) instead of semicolon (;) for --add-data on macOS/Linux
+          pyinstaller --noconsole --noconfirm --onefile \
+            --name YouTubeKnowledgeClipperMac \
+            --add-data "author.png:." \
+            --add-data "help.png:." \
+            --add-data "prompt_templates.json:." \
+            --hidden-import customtkinter \
+            --hidden-import faster_whisper \
+            --hidden-import youtube_transcript_api \
+            --hidden-import yt_dlp \
+            --hidden-import pyperclip \
+            --hidden-import keyboard \
+            --hidden-import PIL.ImageTk \
+            app.py
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: YouTubeKnowledgeClipper-macOS
+          path: dist/YouTubeKnowledgeClipperMac

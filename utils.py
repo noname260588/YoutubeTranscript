@@ -155,29 +155,30 @@ def ensure_dirs() -> None:
 def get_ffmpeg_path() -> str | None:
     """
     Find ffmpeg executable path.
-
-    Search order:
-        1. External ffmpeg/ directory next to app.py or the .exe
+    Looks in:
+        1. External ffmpeg/ directory next to app.py or the executable
         2. Bundled ffmpeg/ directory inside the PyInstaller onefile temp folder
         3. System PATH
-
+    
     Returns:
         Path to ffmpeg executable, or None if not found.
     """
+    exe_name = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+    
     # Check external ffmpeg folder first. This lets users override the bundled
-    # binary by placing a newer ffmpeg.exe next to the app.
-    local_ffmpeg = get_base_dir() / "ffmpeg" / "ffmpeg.exe"
+    # binary by placing a newer ffmpeg next to the app.
+    local_ffmpeg = get_base_dir() / "ffmpeg" / exe_name
     if local_ffmpeg.exists():
         return str(local_ffmpeg)
 
-    # PyInstaller onefile extracts bundled data files into sys._MEIPASS.
-    bundled_base = getattr(sys, "_MEIPASS", None)
+    # Check for ffmpeg bundled by PyInstaller
+    bundled_base = getattr(sys, '_MEIPASS', None)
     if bundled_base:
-        bundled_ffmpeg = Path(bundled_base) / "ffmpeg" / "ffmpeg.exe"
+        bundled_ffmpeg = Path(bundled_base) / "ffmpeg" / exe_name
         if bundled_ffmpeg.exists():
             return str(bundled_ffmpeg)
 
-    # Fallback to system PATH
+    # Fallback to system ffmpeg
     system_ffmpeg = shutil.which("ffmpeg")
     if system_ffmpeg:
         return system_ffmpeg
