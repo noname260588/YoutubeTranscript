@@ -261,6 +261,24 @@ Output: `dist/YouTubeKnowledgeClipper.exe`
 
 ---
 
+## 🍏 Hướng dẫn chạy trên macOS (Mac)
+
+Bản build cho Mac được tạo tự động thông qua GitHub Actions và nén dưới dạng file `.zip`. Vì ứng dụng không được đăng ký (code-sign) bằng tài khoản Apple Developer trả phí, macOS sẽ bật cơ chế bảo vệ Gatekeeper trong lần mở đầu tiên.
+
+### Cài đặt và Mở ứng dụng:
+1. Tải file `YouTubeKnowledgeClipper-macOS.zip` từ mục **Artifacts** trong tab **Actions** trên GitHub.
+2. Giải nén file zip, bạn sẽ nhận được ứng dụng `YouTubeKnowledgeClipperMac.app`.
+3. Khi bạn click đúp để mở lần đầu, macOS sẽ hiện cảnh báo: *"YouTubeKnowledgeClipperMac" Not Opened*. Hãy nhấn **Done**.
+4. Mở **System Settings** (Cài đặt hệ thống) > **Privacy & Security** (Quyền riêng tư & Bảo mật).
+5. Cuộn xuống phần Security, bạn sẽ thấy thông báo ứng dụng bị chặn. Nhấn nút **Open Anyway** (Vẫn mở).
+6. Bấm **Open** ở hộp thoại xác nhận tiếp theo. Các lần sau ứng dụng sẽ tự mở bình thường.
+
+### Lưu ý cho Mac:
+- **FFmpeg**: Bản Mac không nhúng sẵn thư viện `ffmpeg`. Nếu bạn muốn dùng tính năng tải Video/Audio hoặc dùng Speech-to-Text, bạn cần cài ffmpeg vào máy Mac bằng lệnh Terminal: `brew install ffmpeg`.
+- **Phím tắt toàn cục**: Tính năng bôi đen và nhấn `Ctrl + Shift + C` tạm thời bị vô hiệu hóa trên macOS vì Apple yêu cầu cấp quyền Root/Trợ năng (Accessibility) rất phức tạp cho thư viện `keyboard`.
+
+---
+
 ## ⚠️ Lưu ý quan trọng
 
 - **FFmpeg**: Khi chạy từ source, app tìm `ffmpeg/ffmpeg.exe` cạnh `app.py` hoặc FFmpeg trong system PATH. Khi chạy bản `.exe` đã build, FFmpeg được nhúng sẵn trong file onefile.
