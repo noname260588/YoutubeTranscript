@@ -1,0 +1,53 @@
+name: Build Windows App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Setup FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          architecture: x64
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Bundle FFmpeg
+        run: |
+          mkdir ffmpeg
+          $ffmpeg_path = (Get-Command ffmpeg).Source
+          $ffprobe_path = (Get-Command ffprobe).Source
+          Copy-Item $ffmpeg_path -Destination "ffmpeg\ffmpeg.exe"
+          Copy-Item $ffprobe_path -Destination "ffmpeg\ffprobe.exe"
+          Write-Host "FFmpeg successfully bundled."
+
+      - name: Build Windows Executable
+        run: |
+          pyinstaller --noconsole --noconfirm --onefile --name YouTubeKnowledgeClipper --icon icon.ico --add-data "icon.ico;." --add-data "author.png;." --add-data "help.png;." --add-data "prompt_templates.json;." --add-data "ffmpeg;ffmpeg" --hidden-import customtkinter --hidden-import faster_whisper --hidden-import youtube_transcript_api --hidden-import yt_dlp --hidden-import pyperclip --hidden-import keyboard --hidden-import PIL.ImageTk app.py
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouTubeKnowledgeClipper-Windows
+          path: dist\YouTubeKnowledgeClipper.exe
