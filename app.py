@@ -86,19 +86,19 @@ WHISPER_MODELS = ["tiny", "base", "small", "medium"]
 COOKIE_BROWSERS = ["Auto", "None", "Edge", "Chrome", "Firefox", "Brave", "Vivaldi", "Opera"]
 
 # ─── Color Palette ───────────────────────────────────────────────
-C_BG_DARK = "#0a0e17"
-C_BG_CARD = "#161b22"
-C_BG_INPUT = "#1c2333"
-C_BG_ELEVATED = "#20283a"
-C_BORDER = "#30363d"
-C_ACCENT = "#58a6ff"
-C_ACCENT_HOVER = "#79c0ff"
-C_ACCENT_2 = "#3fb950"
-C_TEXT = "#e6edf3"
-C_TEXT_DIM = "#8b949e"
-C_RED = "#f85149"
-C_ORANGE = "#d29922"
-C_PURPLE = "#bc8cff"
+C_BG_DARK = "#0f0f0f"
+C_BG_CARD = "#212121"
+C_BG_INPUT = "#121212"
+C_BG_ELEVATED = "#272727"
+C_BORDER = "#3f3f3f"
+C_ACCENT = "#ff0000"
+C_ACCENT_HOVER = "#cc0000"
+C_ACCENT_2 = "#3ea6ff"
+C_TEXT = "#f1f1f1"
+C_TEXT_DIM = "#aaaaaa"
+C_RED = "#ff4e45"
+C_ORANGE = "#ffa300"
+C_PURPLE = "#3ea6ff"
 
 
 # ═════════════════════════════════════════════════════════════════
