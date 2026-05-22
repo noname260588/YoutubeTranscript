@@ -15,6 +15,7 @@
 |-----------|-------|
 | 🎯 **YouTube Transcript** | Lấy transcript/caption có sẵn từ YouTube |
 | 🎤 **Speech-to-Text Offline** | Tự động tải audio + chuyển thành text bằng faster-whisper |
+| 📑 **Playlist Batch Download** | Quét và tải hàng loạt transcript/video từ Playlist vào thư mục tự động |
 | ⬇️ **Download Video/Audio** | Tải video MP4 hoặc audio M4A từ YouTube |
 | 📊 **Download Progress** | Hiển thị phần trăm, tốc độ và ETA khi `yt-dlp` cung cấp |
 | ⛔ **Cancel Download** | Hủy tác vụ tải video/audio đang chạy |
@@ -297,6 +298,7 @@ https://www.youtube.com/watch?v=VIDEO_ID
 https://youtu.be/VIDEO_ID
 https://www.youtube.com/shorts/VIDEO_ID
 https://m.youtube.com/watch?v=VIDEO_ID
+https://www.youtube.com/playlist?list=PLAYLIST_ID
 ```
 
 ---
@@ -312,6 +314,7 @@ https://m.youtube.com/watch?v=VIDEO_ID
 - [x] Offline Prompt Template Generator (Key ideas, Quotes, Summaries)
 - [x] Extract YouTube metadata (Chapters, Description, Tags)
 - [x] In-app Tutorial & About dialog with static image support
+- [x] Tải hàng loạt theo Playlist (Batch Processing)
 - [ ] Dark/Light theme toggle
 - [ ] Drag & drop local audio file
 - [ ] Auto summarize with local AI (without copy-pasting)
