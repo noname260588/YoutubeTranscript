@@ -44,10 +44,15 @@ jobs:
 
       - name: Build Windows Executable
         run: |
-          pyinstaller --noconsole --noconfirm --onefile --name YouTubeKnowledgeClipper --icon icon.ico --add-data "icon.ico;." --add-data "author.png;." --add-data "help.png;." --add-data "prompt_templates.json;." --add-data "ffmpeg;ffmpeg" --hidden-import customtkinter --hidden-import faster_whisper --hidden-import youtube_transcript_api --hidden-import yt_dlp --hidden-import pyperclip --hidden-import keyboard --hidden-import PIL.ImageTk app.py
+          pyinstaller --noconsole --noconfirm --onedir --name YouTubeKnowledgeClipper --icon icon.ico --add-data "icon.ico;." --add-data "author.png;." --add-data "help.png;." --add-data "prompt_templates.json;." --add-data "ffmpeg;ffmpeg" --hidden-import customtkinter --hidden-import faster_whisper --hidden-import youtube_transcript_api --hidden-import yt_dlp --hidden-import pyperclip --hidden-import keyboard --hidden-import PIL.ImageTk app.py
+
+      - name: Zip Windows App
+        run: |
+          cd dist
+          Compress-Archive -Path YouTubeKnowledgeClipper -DestinationPath YouTubeKnowledgeClipper-Windows.zip
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: YouTubeKnowledgeClipper-Windows
-          path: dist\YouTubeKnowledgeClipper.exe
+          path: dist\YouTubeKnowledgeClipper-Windows.zip

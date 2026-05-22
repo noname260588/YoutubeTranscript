@@ -52,10 +52,10 @@ if not exist "ffmpeg\ffprobe.exe" (
 echo FFmpeg files ready for bundling.
 
 echo.
-echo [4/4] Building executable (onefile)...
+echo [4/4] Building executable (onedir)...
 pyinstaller --noconsole ^
     --noconfirm ^
-    --onefile ^
+    --onedir ^
     --name YouTubeKnowledgeClipper ^
     --icon icon.ico ^
     --add-data "icon.ico;." ^
@@ -81,10 +81,10 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo   Build complete!
-echo   Output: dist\YouTubeKnowledgeClipper.exe
+echo   Output: dist\YouTubeKnowledgeClipper\YouTubeKnowledgeClipper.exe
 echo ============================================
 echo.
-echo FFmpeg is bundled into the onefile executable.
+echo FFmpeg is bundled into the application folder.
 echo Runtime folders will be created next to the executable when needed:
 echo   - models\   (Whisper models)
 echo   - downloads\ (temporary audio/video files)
