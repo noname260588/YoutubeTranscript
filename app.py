@@ -1173,13 +1173,27 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         # 2. Options
         self.playlist_options_card = ctk.CTkFrame(self.tab_playlist, fg_color=C_BG_CARD, corner_radius=12, border_width=1, border_color=C_BORDER)
         self.playlist_options_card.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        self.playlist_options_card.columnconfigure(1, weight=1)
         
-        opt_lbl1 = ctk.CTkLabel(self.playlist_options_card, text="Lưu Playlist vào thư mục con:", text_color=C_TEXT_DIM)
-        opt_lbl1.grid(row=0, column=0, padx=14, pady=8, sticky="w")
+        opt_lbl1 = ctk.CTkLabel(self.playlist_options_card, text="Thư mục lưu:", text_color=C_TEXT_DIM)
+        opt_lbl1.grid(row=0, column=0, padx=14, pady=(8, 4), sticky="w")
+        
+        default_dir = self.settings.get("export_dir", "")
+        if not default_dir or not Path(default_dir).exists():
+            from utils import ensure_dirs, get_base_dir
+            ensure_dirs()
+            default_dir = str(get_base_dir() / "exports")
+            
+        self.playlist_parent_dir_var = ctk.StringVar(value=default_dir)
+        self.playlist_parent_dir_lbl = ctk.CTkLabel(self.playlist_options_card, textvariable=self.playlist_parent_dir_var, text_color=C_TEXT, anchor="w")
+        self.playlist_parent_dir_lbl.grid(row=0, column=1, padx=4, pady=(8, 4), sticky="ew")
+        
+        self.playlist_browse_btn = MyCTkButton(self.playlist_options_card, text="Đổi Thư mục", width=100, height=28, fg_color=C_BG_ELEVATED, hover_color=C_BORDER, text_color=C_TEXT, command=self._on_browse_playlist_dir)
+        self.playlist_browse_btn.grid(row=0, column=2, padx=14, pady=(8, 4), sticky="e")
         
         self.playlist_auto_folder_var = ctk.BooleanVar(value=True)
-        self.playlist_auto_folder_checkbox = ctk.CTkCheckBox(self.playlist_options_card, text="Tự động tạo thư mục theo tên Playlist (VD: exports/Ten_Khoa_Hoc/)", variable=self.playlist_auto_folder_var, text_color=C_TEXT)
-        self.playlist_auto_folder_checkbox.grid(row=0, column=1, padx=14, pady=8, sticky="w")
+        self.playlist_auto_folder_checkbox = ctk.CTkCheckBox(self.playlist_options_card, text="Tự động tạo thư mục con theo ID của Playlist", variable=self.playlist_auto_folder_var, text_color=C_TEXT)
+        self.playlist_auto_folder_checkbox.grid(row=1, column=0, columnspan=3, padx=14, pady=(0, 8), sticky="w")
         
         # 3. Video List
         self.playlist_videos_frame = ctk.CTkScrollableFrame(self.tab_playlist, fg_color=C_BG_INPUT, corner_radius=8, border_width=1, border_color=C_BORDER)
@@ -2565,6 +2579,11 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         
         threading.Thread(target=_scan, daemon=True).start()
 
+    def _on_browse_playlist_dir(self):
+        folder = filedialog.askdirectory(initialdir=self.playlist_parent_dir_var.get(), title="Chọn thư mục lưu Playlist")
+        if folder:
+            self.playlist_parent_dir_var.set(folder)
+
     def _on_playlist_scanned(self, videos: list):
         self.scan_playlist_btn.configure(state="normal", text="🔍 Quét Playlist")
         if not videos:
@@ -2595,14 +2614,13 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.playlist_start_btn.configure(state="disabled")
         
         def _batch_process():
-            from services.settings_service import get_settings
             from services.export_service import export_markdown
             
-            settings = get_settings()
-            base_dir = settings.get("export_dir", "")
+            base_dir = self.playlist_parent_dir_var.get()
             if not base_dir or not Path(base_dir).exists():
-                from utils import ensure_dirs
-                base_dir = str(ensure_dirs()["exports"])
+                from utils import ensure_dirs, get_base_dir
+                ensure_dirs()
+                base_dir = str(get_base_dir() / "exports")
                 
             folder_path = Path(base_dir)
             if self.playlist_auto_folder_var.get():
