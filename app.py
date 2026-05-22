@@ -15,6 +15,17 @@ from tkinter import filedialog, messagebox
 from pathlib import Path
 
 import customtkinter as ctk
+
+class MyCTkButton(ctk.CTkButton):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("cursor", "hand2")
+        super().__init__(*args, **kwargs)
+
+class MyCTkOptionMenu(ctk.CTkOptionMenu):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("cursor", "hand2")
+        super().__init__(*args, **kwargs)
+
 try:
     import keyboard
     HAS_KEYBOARD = True
@@ -75,7 +86,7 @@ WHISPER_MODELS = ["tiny", "base", "small", "medium"]
 COOKIE_BROWSERS = ["Auto", "None", "Edge", "Chrome", "Firefox", "Brave", "Vivaldi", "Opera"]
 
 # ─── Color Palette ───────────────────────────────────────────────
-C_BG_DARK = "#0d1117"
+C_BG_DARK = "#0a0e17"
 C_BG_CARD = "#161b22"
 C_BG_INPUT = "#1c2333"
 C_BG_ELEVATED = "#20283a"
@@ -146,300 +157,8 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # Hide the main window until the welcome loading animation completes.
-        self.withdraw()
-        self.after(80, self._show_welcome_effect)
 
-    def _show_main_window(self):
-        """Reveal and focus the main window after startup loading."""
-        try:
-            self.deiconify()
-            self.lift()
-            self.focus_force()
-        except Exception:
-            pass
 
-    def _show_welcome_effect(self):
-        """Show a short non-blocking welcome splash when the app starts."""
-        if getattr(self, "_welcome_splash", None):
-            try:
-                if self._welcome_splash.winfo_exists():
-                    return
-            except Exception:
-                pass
-
-        splash = ctk.CTkToplevel(self)
-        self._welcome_splash = splash
-        splash.overrideredirect(True)
-        splash.configure(fg_color=C_BG_DARK)
-
-        try:
-            splash.attributes("-alpha", 0.0)
-            splash.attributes("-topmost", True)
-        except Exception:
-            pass
-
-        splash_width = 620
-        splash_height = 320
-        self.update_idletasks()
-        x = (self.winfo_screenwidth() - splash_width) // 2
-        y = (self.winfo_screenheight() - splash_height) // 2
-        splash.geometry(f"{splash_width}x{splash_height}+{x}+{y}")
-        splash.lift()
-
-        card = ctk.CTkFrame(
-            splash,
-            fg_color=C_BG_CARD,
-            corner_radius=14,
-            border_width=1,
-            border_color=C_BORDER,
-        )
-        card.pack(fill="both", expand=True, padx=14, pady=14)
-        card.grid_columnconfigure(0, minsize=188)
-        card.grid_columnconfigure(1, weight=1)
-
-        visual_canvas = tk.Canvas(
-            card,
-            width=168,
-            height=152,
-            bg=C_BG_CARD,
-            highlightthickness=0,
-            bd=0,
-        )
-        visual_canvas.grid(row=0, column=0, rowspan=3, padx=(24, 18), pady=(34, 0), sticky="n")
-
-        title_label = ctk.CTkLabel(
-            card,
-            text=APP_TITLE,
-            font=ctk.CTkFont(size=24, weight="bold"),
-            text_color=C_TEXT,
-            anchor="w",
-        )
-        title_label.grid(row=0, column=1, sticky="ew", padx=(0, 34), pady=(44, 0))
-
-        subtitle_label = ctk.CTkLabel(
-            card,
-            text="Sẵn sàng trích xuất transcript, tải video và chạy STT",
-            font=ctk.CTkFont(size=13),
-            text_color=C_TEXT_DIM,
-            anchor="w",
-            wraplength=340,
-        )
-        subtitle_label.grid(row=1, column=1, sticky="ew", padx=(0, 34), pady=(6, 0))
-
-        badge_label = ctk.CTkLabel(
-            card,
-            text="Transcript • Download • Whisper",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color=C_ACCENT,
-            anchor="w",
-        )
-        badge_label.grid(row=2, column=1, sticky="ew", padx=(0, 34), pady=(18, 0))
-
-        progress = ctk.CTkProgressBar(
-            card,
-            mode="determinate",
-            height=6,
-            progress_color=C_ACCENT,
-            fg_color=C_BG_INPUT,
-            corner_radius=3,
-        )
-        progress.grid(row=3, column=0, columnspan=2, sticky="ew", padx=34, pady=(30, 8))
-        progress.set(0)
-
-        hint_label = ctk.CTkLabel(
-            card,
-            text="Click hoặc Esc để bỏ qua",
-            font=ctk.CTkFont(size=10),
-            text_color=C_TEXT_DIM,
-        )
-        hint_label.grid(row=4, column=0, columnspan=2, sticky="ew", padx=34, pady=(0, 22))
-
-        closed = {"value": False}
-
-        def draw_welcome_visual(step: int):
-            visual_canvas.delete("all")
-            width = 168
-            height = 152
-            center_x = width / 2
-            center_y = height / 2 + 2
-            scale = 1.42
-            pulse = (math.sin(step * 0.36) + 1) / 2
-            tilt = math.sin(step * 0.16) * 5 * scale
-            yaw = math.sin(step * 0.2) * 7 * scale
-
-            def sx(value: float) -> float:
-                return center_x + (value - 52) * scale
-
-            def sy(value: float) -> float:
-                return center_y + (value - 52) * scale
-
-            # Hologram base rings.
-            visual_canvas.create_oval(
-                sx(14),
-                sy(78),
-                sx(90),
-                sy(95),
-                outline="#263247",
-                width=2,
-            )
-            visual_canvas.create_oval(
-                sx(23),
-                sy(82),
-                sx(81),
-                sy(91),
-                outline="#1f6feb",
-                width=1,
-            )
-            visual_canvas.create_arc(
-                sx(10),
-                sy(74),
-                sx(94),
-                sy(98),
-                start=(step * 10) % 360,
-                extent=72,
-                outline=C_ACCENT_2,
-                width=2,
-                style="arc",
-            )
-
-            # Hologram scan lines.
-            for offset in range(0, 58, 9):
-                y = 26 + offset + math.sin(step * 0.2 + offset) * 1.4
-                visual_canvas.create_line(
-                    sx(24),
-                    sy(y),
-                    sx(80),
-                    sy(y),
-                    fill="#1f6feb",
-                    width=1,
-                )
-
-            # A pseudo-3D rounded play slab, drawn as layered polygons.
-            front = [
-                (sx(28) + yaw, sy(30) + tilt),
-                (sx(72) + yaw, sy(24) - tilt * 0.2),
-                (sx(82) - yaw * 0.3, sy(51)),
-                (sx(70) - yaw, sy(72) + tilt * 0.2),
-                (sx(29) - yaw * 0.2, sy(66) - tilt),
-                (sx(20) + yaw * 0.2, sy(48)),
-            ]
-            back = [(x + 10, y + 10) for x, y in front]
-
-            for index in range(len(front)):
-                next_index = (index + 1) % len(front)
-                side = [
-                    front[index],
-                    front[next_index],
-                    back[next_index],
-                    back[index],
-                ]
-                visual_canvas.create_polygon(side, fill="#11223a", outline="#1f6feb")
-
-            glow_color = C_PURPLE if pulse > 0.62 else C_ACCENT
-            visual_canvas.create_polygon(back, fill="#07111f", outline="#1f6feb", width=1)
-            visual_canvas.create_polygon(front, fill="#10243b", outline="#0a1320", width=5)
-            visual_canvas.create_polygon(front, fill="#10243b", outline=glow_color, width=2)
-
-            play_depth = 7 + pulse * 4
-            play_shadow = [
-                (sx(43) + yaw * 0.25 + play_depth, sy(38) + play_depth),
-                (sx(43) + yaw * 0.25 + play_depth, sy(60) + play_depth),
-                (sx(62) + yaw * 0.25 + play_depth, sy(49) + play_depth),
-            ]
-            play_front = [
-                (sx(43) + yaw * 0.25, sy(38)),
-                (sx(43) + yaw * 0.25, sy(60)),
-                (sx(62) + yaw * 0.25, sy(49)),
-            ]
-            visual_canvas.create_polygon(play_shadow, fill="#07111f", outline="")
-            visual_canvas.create_polygon(play_front, fill=C_ACCENT_2, outline="#b6f7c4", width=1)
-
-            # Orbiting hologram particles.
-            for i in range(5):
-                theta = step * 0.22 + (i * math.tau / 5)
-                ox = center_x + math.cos(theta) * 58
-                oy = center_y + math.sin(theta) * 27 + 12
-                radius = 2.2 + (i % 2) * 1.0
-                color = C_ACCENT_2 if i % 2 else C_ACCENT
-                visual_canvas.create_oval(ox - radius, oy - radius, ox + radius, oy + radius, fill=color, outline="")
-
-            for i, label in enumerate(("YT", "AI")):
-                theta = -step * 0.18 + (i * math.pi)
-                ox = center_x + math.cos(theta) * 50
-                oy = center_y + math.sin(theta) * 16 + 54
-                visual_canvas.create_rectangle(
-                    ox - 15,
-                    oy - 8,
-                    ox + 15,
-                    oy + 8,
-                    fill=C_BG_INPUT,
-                    outline=C_BORDER,
-                    width=1,
-                )
-                visual_canvas.create_text(
-                    ox,
-                    oy,
-                    text=label,
-                    fill=C_TEXT_DIM,
-                    font=("Segoe UI", 8, "bold"),
-                )
-
-            visual_canvas.create_text(
-                center_x,
-                18,
-                text="PLAY",
-                fill=C_ACCENT,
-                font=("Segoe UI", 11, "bold"),
-            )
-
-        def close_splash(_event=None):
-            if closed["value"]:
-                return
-            closed["value"] = True
-            try:
-                splash.destroy()
-            except Exception:
-                pass
-            self._welcome_splash = None
-            self._show_main_window()
-
-        def animate(step: int = 0):
-            if closed["value"]:
-                return
-            try:
-                if not splash.winfo_exists():
-                    return
-
-                total_steps = 34
-                fade_in_steps = 8
-                fade_out_start = 26
-
-                if step <= fade_in_steps:
-                    alpha = 0.12 + (step / fade_in_steps) * 0.84
-                elif step >= fade_out_start:
-                    alpha = max(0.0, 0.96 - ((step - fade_out_start) / 8) * 0.96)
-                else:
-                    alpha = 0.96
-
-                try:
-                    splash.attributes("-alpha", alpha)
-                except Exception:
-                    pass
-
-                draw_welcome_visual(step)
-                progress.set(min(step / total_steps, 1.0))
-                if step >= total_steps:
-                    close_splash()
-                else:
-                    splash.after(45, lambda: animate(step + 1))
-            except Exception:
-                close_splash()
-
-        splash.bind("<Escape>", close_splash)
-        splash.bind("<Button-1>", close_splash)
-        card.bind("<Button-1>", close_splash)
-        animate()
 
 
     # ═════════════════════════════════════════════════════════════
@@ -528,7 +247,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         subtitle_label.pack(anchor="w", pady=(1, 0))
 
         # About button
-        self.about_btn = ctk.CTkButton(
+        self.about_btn = MyCTkButton(
             header_frame,
             text="ℹ️ About",
             width=82,
@@ -541,7 +260,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.about_btn.pack(side="right")
 
         # Tutorial button
-        self.tutorial_btn = ctk.CTkButton(
+        self.tutorial_btn = MyCTkButton(
             header_frame,
             text="📖 Hướng dẫn",
             width=106,
@@ -553,7 +272,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.tutorial_btn.pack(side="right", padx=(0, 5))
 
-        self.settings_btn = ctk.CTkButton(
+        self.settings_btn = MyCTkButton(
             header_frame,
             text="⚙️ Settings",
             width=92,
@@ -601,7 +320,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.url_entry.grid(row=1, column=0, sticky="ew", padx=(14, 6), pady=(0, 7))
         self.url_entry.bind("<Return>", lambda e: self._on_get_transcript())
 
-        self.paste_url_btn = ctk.CTkButton(
+        self.paste_url_btn = MyCTkButton(
             self.input_card,
             text="📋 Dán",
             font=ctk.CTkFont(size=12, weight="bold"),
@@ -615,7 +334,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.paste_url_btn.grid(row=1, column=1, sticky="e", padx=(0, 6), pady=(0, 7))
 
-        self.clear_url_btn = ctk.CTkButton(
+        self.clear_url_btn = MyCTkButton(
             self.input_card,
             text="✕",
             font=ctk.CTkFont(size=15, weight="bold"),
@@ -636,7 +355,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         action_row.columnconfigure(1, weight=1, uniform="input_actions")
         action_row.columnconfigure(2, weight=0)
 
-        self.get_btn = ctk.CTkButton(
+        self.get_btn = MyCTkButton(
             action_row,
             text="⚡ Lấy Transcript",
             font=ctk.CTkFont(size=12, weight="bold"),
@@ -648,7 +367,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.get_btn.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
-        self.download_video_btn = ctk.CTkButton(
+        self.download_video_btn = MyCTkButton(
             action_row,
             text="⬇️ Tải Video",
             font=ctk.CTkFont(size=12, weight="bold"),
@@ -660,7 +379,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.download_video_btn.grid(row=0, column=1, sticky="ew", padx=(0, 8))
 
-        self.cancel_btn = ctk.CTkButton(
+        self.cancel_btn = MyCTkButton(
             action_row,
             text="⛔ Hủy",
             font=ctk.CTkFont(size=12, weight="bold"),
@@ -693,7 +412,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         if language_value not in LANGUAGES:
             language_value = "Auto"
         self.language_var = ctk.StringVar(value=language_value)
-        self.language_dropdown = ctk.CTkOptionMenu(
+        self.language_dropdown = MyCTkOptionMenu(
             self.options_card,
             variable=self.language_var,
             values=LANGUAGES,
@@ -714,7 +433,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         if mode_value not in MODES:
             mode_value = "Auto"
         self.mode_var = ctk.StringVar(value=mode_value)
-        self.mode_dropdown = ctk.CTkOptionMenu(
+        self.mode_dropdown = MyCTkOptionMenu(
             self.options_card,
             variable=self.mode_var,
             values=MODES,
@@ -735,7 +454,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         if whisper_model_value not in WHISPER_MODELS:
             whisper_model_value = "small"
         self.whisper_model_var = ctk.StringVar(value=whisper_model_value)
-        self.whisper_model_dropdown = ctk.CTkOptionMenu(
+        self.whisper_model_dropdown = MyCTkOptionMenu(
             self.options_card,
             variable=self.whisper_model_var,
             values=WHISPER_MODELS,
@@ -753,7 +472,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         self._make_option_label(self.options_card, "📥 Format", 0, 3)
         self.download_format_var = ctk.StringVar(value="Video (MP4)")
-        self.download_format_dropdown = ctk.CTkOptionMenu(
+        self.download_format_dropdown = MyCTkOptionMenu(
             self.options_card,
             variable=self.download_format_var,
             values=["Video (MP4)", "Audio (M4A)"],
@@ -771,7 +490,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         self._make_option_label(self.options_card, "🎞️ Quality", 0, 4)
         self.video_quality_var = ctk.StringVar(value="480p")
-        self.video_quality_dropdown = ctk.CTkOptionMenu(
+        self.video_quality_dropdown = MyCTkOptionMenu(
             self.options_card,
             variable=self.video_quality_var,
             values=["Best", "1080p", "720p", "480p"],
@@ -788,7 +507,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
         self._make_option_label(self.options_card, "🍪 Cookies", 0, 5)
         self.cookie_browser_var = ctk.StringVar(value="Auto")
-        self.cookie_browser_dropdown = ctk.CTkOptionMenu(
+        self.cookie_browser_dropdown = MyCTkOptionMenu(
             self.options_card,
             variable=self.cookie_browser_var,
             values=COOKIE_BROWSERS,
@@ -1227,7 +946,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.action_buttons = []
         self.output_action_buttons = []
         for text, color, cmd, requires_output in buttons:
-            btn = ctk.CTkButton(
+            btn = MyCTkButton(
                 self.btn_frame,
                 text=text,
                 font=ctk.CTkFont(size=12, weight="bold"),
@@ -1268,7 +987,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             template["name"]: template["id"] for template in self.prompt_templates
         }
         self.prompt_template_var = ctk.StringVar(value=template_names[0])
-        self.prompt_template_dropdown = ctk.CTkOptionMenu(
+        self.prompt_template_dropdown = MyCTkOptionMenu(
             self.prompt_card,
             variable=self.prompt_template_var,
             values=template_names,
@@ -1283,7 +1002,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self.prompt_template_dropdown.grid(row=1, column=0, sticky="ew", padx=(12, 6), pady=(0, 6))
 
         self.prompt_transcript_mode_var = ctk.StringVar(value="Use Clean Transcript")
-        self.prompt_transcript_mode_dropdown = ctk.CTkOptionMenu(
+        self.prompt_transcript_mode_dropdown = MyCTkOptionMenu(
             self.prompt_card,
             variable=self.prompt_transcript_mode_var,
             values=["Use Clean Transcript", "Use Raw Transcript", "Use Transcript with timestamps"],
@@ -1309,7 +1028,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         button_frame = ctk.CTkFrame(self.prompt_card, fg_color="transparent")
         button_frame.grid(row=1, column=3, sticky="e", padx=(0, 12), pady=(0, 6))
 
-        self.generate_prompt_btn = ctk.CTkButton(
+        self.generate_prompt_btn = MyCTkButton(
             button_frame,
             text="Generate Prompt",
             width=118,
@@ -1318,7 +1037,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.generate_prompt_btn.pack(side="left", padx=(0, 6))
 
-        self.copy_prompt_only_btn = ctk.CTkButton(
+        self.copy_prompt_only_btn = MyCTkButton(
             button_frame,
             text="Copy Prompt Only",
             width=126,
@@ -1329,7 +1048,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         self.copy_prompt_only_btn.pack(side="left", padx=(0, 6))
 
-        self.copy_prompt_transcript_btn = ctk.CTkButton(
+        self.copy_prompt_transcript_btn = MyCTkButton(
             button_frame,
             text="Copy + Transcript",
             width=128,
@@ -1704,7 +1423,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             if selected:
                 vault_var.set(selected)
 
-        ctk.CTkButton(
+        MyCTkButton(
             container,
             text="Browse",
             width=86,
@@ -1726,7 +1445,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         ).grid(row=7, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 12))
 
         add_label("Markdown mode", 8)
-        mode_dropdown = ctk.CTkOptionMenu(
+        mode_dropdown = MyCTkOptionMenu(
             container,
             variable=markdown_mode_var,
             values=MARKDOWN_MODES,
@@ -1793,13 +1512,13 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             self._set_status("✅ Đã lưu settings", C_ACCENT_2)
             settings_win.destroy()
 
-        ctk.CTkButton(
+        MyCTkButton(
             button_row,
             text="Save",
             width=110,
             command=save_dialog_settings,
         ).pack(side="right")
-        ctk.CTkButton(
+        MyCTkButton(
             button_row,
             text="Cancel",
             width=110,
@@ -1848,7 +1567,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         )
         info_lbl.pack(pady=20)
         
-        close_btn = ctk.CTkButton(
+        close_btn = MyCTkButton(
             about_win, 
             text="Đóng", 
             width=100,
@@ -2053,7 +1772,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                         state["scale"] = get_fit_scale()
                     render_image()
 
-                zoom_out_btn = ctk.CTkButton(
+                zoom_out_btn = MyCTkButton(
                     toolbar,
                     text="-",
                     width=36,
@@ -2061,7 +1780,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 )
                 zoom_out_btn.grid(row=0, column=2, padx=4, pady=10)
 
-                zoom_in_btn = ctk.CTkButton(
+                zoom_in_btn = MyCTkButton(
                     toolbar,
                     text="+",
                     width=36,
@@ -2069,7 +1788,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 )
                 zoom_in_btn.grid(row=0, column=3, padx=4, pady=10)
 
-                actual_btn = ctk.CTkButton(
+                actual_btn = MyCTkButton(
                     toolbar,
                     text="100%",
                     width=64,
@@ -2077,7 +1796,7 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
                 )
                 actual_btn.grid(row=0, column=4, padx=4, pady=10)
 
-                fit_btn = ctk.CTkButton(
+                fit_btn = MyCTkButton(
                     toolbar,
                     text="Fit",
                     width=64,
