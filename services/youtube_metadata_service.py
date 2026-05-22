@@ -151,6 +151,7 @@ def get_youtube_metadata(url: str) -> dict:
         "no_warnings": True,
         "skip_download": True,
         "noplaylist": True,
+        "extractor_args": {"youtube": ["player_client=android"]},
     }
 
     attempts = get_cookie_browser_attempts("Auto")
@@ -194,6 +195,7 @@ def get_playlist_info(url: str) -> list[dict]:
         "quiet": True,
         "no_warnings": True,
         "extract_flat": True,
+        "extractor_args": {"youtube": ["player_client=android"]},
     }
 
     attempts = get_cookie_browser_attempts("Auto")

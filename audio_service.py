@@ -106,6 +106,7 @@ def download_audio(
         'quiet': True,
         'no_warnings': True,
         'noprogress': False,
+        'extractor_args': {'youtube': ['player_client=android']},
     }
 
     # Set ffmpeg location if using local ffmpeg
@@ -211,6 +212,7 @@ def get_video_info(video_url: str, cookie_browser: str | None = "Auto") -> dict:
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
+        'extractor_args': {'youtube': ['player_client=android']},
     }
 
     attempts = get_cookie_browser_attempts(cookie_browser)

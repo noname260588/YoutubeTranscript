@@ -110,6 +110,7 @@ def download_video(
             'quiet': True,
             'no_warnings': True,
             'noprogress': False,
+            'extractor_args': {'youtube': ['player_client=android']},
         }
     else:
         # Video quality map
@@ -129,6 +130,7 @@ def download_video(
             'quiet': True,
             'no_warnings': True,
             'noprogress': False,
+            'extractor_args': {'youtube': ['player_client=android']},
         }
 
     if ffmpeg_dir:
