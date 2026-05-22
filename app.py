@@ -175,8 +175,20 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
 
     def _build_ui(self):
         """Build the complete UI layout."""
-        self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_frame.pack(fill="both", expand=True, padx=14, pady=8)
+        self.tab_view = ctk.CTkTabview(
+            self,
+            segmented_button_selected_color=C_ACCENT,
+            segmented_button_selected_hover_color=C_ACCENT_HOVER,
+            fg_color="transparent"
+        )
+        self.tab_view.pack(fill="both", expand=True, padx=14, pady=8)
+
+        self.tab_single = self.tab_view.add("Video Đơn")
+        self.tab_playlist = self.tab_view.add("Tải Playlist")
+
+        # ─── TAB 1: Video Đơn ───
+        self.main_frame = ctk.CTkFrame(self.tab_single, fg_color="transparent")
+        self.main_frame.pack(fill="both", expand=True)
 
         self.main_frame.columnconfigure(0, weight=1)
         self.main_frame.rowconfigure(3, weight=4, minsize=OUTPUT_DEFAULT_HEIGHT)
@@ -188,6 +200,9 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         self._build_action_buttons(row=4)
         self._build_prompt_section(row=4)
         self._build_status_bar(row=5)
+
+        # ─── TAB 2: Playlist ───
+        self._build_playlist_tab()
 
     def _build_header(self, row: int):
         """Header section."""
@@ -1134,6 +1149,56 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
             "<Configure>",
             lambda event: self.status_label.configure(wraplength=max(event.width - 310, 280)),
         )
+
+    def _build_playlist_tab(self):
+        """Build the Playlist tab layout."""
+        self.tab_playlist.columnconfigure(0, weight=1)
+        self.tab_playlist.rowconfigure(2, weight=1)
+
+        # 1. Nhập Playlist URL
+        self.playlist_input_card = ctk.CTkFrame(self.tab_playlist, fg_color=C_BG_CARD, corner_radius=12, border_width=1, border_color=C_BORDER)
+        self.playlist_input_card.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        self.playlist_input_card.columnconfigure(0, weight=1)
+
+        playlist_label = ctk.CTkLabel(self.playlist_input_card, text="🔗 YouTube Playlist URL", font=ctk.CTkFont(size=12, weight="bold"), text_color=C_TEXT_DIM)
+        playlist_label.grid(row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(8, 3))
+
+        self.playlist_url_entry = ctk.CTkEntry(self.playlist_input_card, placeholder_text="Dán link Playlist YouTube vào đây...", font=ctk.CTkFont(size=12), height=36, fg_color=C_BG_INPUT, border_color=C_BORDER, text_color=C_TEXT, corner_radius=10)
+        self.playlist_url_entry.grid(row=1, column=0, sticky="ew", padx=(14, 6), pady=(0, 7))
+        self.playlist_url_entry.bind("<Return>", lambda e: self._on_scan_playlist())
+
+        self.scan_playlist_btn = MyCTkButton(self.playlist_input_card, text="🔍 Quét Playlist", font=ctk.CTkFont(size=12, weight="bold"), height=36, width=120, fg_color=C_ACCENT, hover_color=C_ACCENT_HOVER, text_color="#ffffff", command=self._on_scan_playlist)
+        self.scan_playlist_btn.grid(row=1, column=1, sticky="e", padx=(0, 14), pady=(0, 7))
+
+        # 2. Options
+        self.playlist_options_card = ctk.CTkFrame(self.tab_playlist, fg_color=C_BG_CARD, corner_radius=12, border_width=1, border_color=C_BORDER)
+        self.playlist_options_card.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        
+        opt_lbl1 = ctk.CTkLabel(self.playlist_options_card, text="Lưu Playlist vào thư mục con:", text_color=C_TEXT_DIM)
+        opt_lbl1.grid(row=0, column=0, padx=14, pady=8, sticky="w")
+        
+        self.playlist_auto_folder_var = ctk.BooleanVar(value=True)
+        self.playlist_auto_folder_checkbox = ctk.CTkCheckBox(self.playlist_options_card, text="Tự động tạo thư mục theo tên Playlist (VD: exports/Ten_Khoa_Hoc/)", variable=self.playlist_auto_folder_var, text_color=C_TEXT)
+        self.playlist_auto_folder_checkbox.grid(row=0, column=1, padx=14, pady=8, sticky="w")
+        
+        # 3. Video List
+        self.playlist_videos_frame = ctk.CTkScrollableFrame(self.tab_playlist, fg_color=C_BG_INPUT, corner_radius=8, border_width=1, border_color=C_BORDER)
+        self.playlist_videos_frame.grid(row=2, column=0, sticky="nsew", pady=(0, 6))
+        
+        self.playlist_checkboxes = []
+        self.playlist_video_data = []
+
+        # 4. Actions & Log
+        self.playlist_action_card = ctk.CTkFrame(self.tab_playlist, fg_color=C_BG_CARD, corner_radius=12, border_width=1, border_color=C_BORDER)
+        self.playlist_action_card.grid(row=3, column=0, sticky="ew")
+        self.playlist_action_card.columnconfigure(0, weight=1)
+
+        self.playlist_start_btn = MyCTkButton(self.playlist_action_card, text="▶ Bắt đầu Tải Hàng Loạt", font=ctk.CTkFont(size=12, weight="bold"), height=36, fg_color=C_ACCENT, hover_color=C_ACCENT_HOVER, text_color="#ffffff", command=self._on_start_playlist_batch)
+        self.playlist_start_btn.grid(row=0, column=0, sticky="ew", padx=14, pady=8)
+
+        self.playlist_log = ctk.CTkTextbox(self.playlist_action_card, font=ctk.CTkFont(family="Consolas", size=11), fg_color=C_BG_INPUT, text_color=C_TEXT_DIM, height=80)
+        self.playlist_log.grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 8))
+
 
     # ═════════════════════════════════════════════════════════════
     #  ACTIONS
@@ -2473,6 +2538,141 @@ class YouTubeKnowledgeClipperApp(ctk.CTk):
         except Exception as e:
             self._set_status("❌ Lỗi lưu file", C_RED)
             messagebox.showerror("Lỗi lưu file", str(e))
+
+    def _on_scan_playlist(self):
+        url = self.playlist_url_entry.get().strip()
+        if not url:
+            self.playlist_log.insert("end", "Vui lòng nhập URL Playlist.\n")
+            return
+            
+        self.scan_playlist_btn.configure(state="disabled", text="Đang quét...")
+        self.playlist_log.delete("0.0", "end")
+        self.playlist_log.insert("end", f"Đang quét Playlist: {url}\n")
+        
+        for cb in self.playlist_checkboxes:
+            cb.destroy()
+        self.playlist_checkboxes.clear()
+        self.playlist_video_data.clear()
+        
+        def _scan():
+            from services.youtube_metadata_service import get_playlist_info
+            try:
+                videos = get_playlist_info(url)
+                self.after(0, self._on_playlist_scanned, videos)
+            except Exception as e:
+                self.after(0, lambda e=e: self.playlist_log.insert("end", f"Lỗi: {e}\n"))
+                self.after(0, lambda: self.scan_playlist_btn.configure(state="normal", text="🔍 Quét Playlist"))
+        
+        threading.Thread(target=_scan, daemon=True).start()
+
+    def _on_playlist_scanned(self, videos: list):
+        self.scan_playlist_btn.configure(state="normal", text="🔍 Quét Playlist")
+        if not videos:
+            self.playlist_log.insert("end", "Không tìm thấy video nào hoặc link không hợp lệ.\n")
+            return
+            
+        self.playlist_log.insert("end", f"Đã tìm thấy {len(videos)} video.\n")
+        self.playlist_video_data = videos
+        
+        for i, vid in enumerate(videos):
+            var = ctk.BooleanVar(value=True)
+            cb = ctk.CTkCheckBox(
+                self.playlist_videos_frame, 
+                text=f"{i+1}. {vid.get('title', 'Unknown')} ({vid.get('duration', 0)}s)", 
+                variable=var,
+                text_color=C_TEXT
+            )
+            cb.grid(row=i, column=0, sticky="w", padx=5, pady=2)
+            vid['_var'] = var
+            self.playlist_checkboxes.append(cb)
+
+    def _on_start_playlist_batch(self):
+        videos_to_download = [v for v in self.playlist_video_data if v.get('_var') and v['_var'].get()]
+        if not videos_to_download:
+            self.playlist_log.insert("end", "Chưa chọn video nào để tải.\n")
+            return
+            
+        self.playlist_start_btn.configure(state="disabled")
+        
+        def _batch_process():
+            from services.settings_service import get_settings
+            from services.export_service import export_markdown
+            
+            settings = get_settings()
+            base_dir = settings.get("export_dir", "")
+            if not base_dir or not Path(base_dir).exists():
+                from utils import ensure_dirs
+                base_dir = str(ensure_dirs()["exports"])
+                
+            folder_path = Path(base_dir)
+            if self.playlist_auto_folder_var.get():
+                playlist_id = extract_video_id(self.playlist_url_entry.get().strip())
+                if not playlist_id:
+                    playlist_id = "Data"
+                folder_name = sanitize_filename(f"Playlist_{playlist_id}")
+                folder_path = folder_path / folder_name
+                folder_path.mkdir(parents=True, exist_ok=True)
+                
+            self.after(0, lambda: self.playlist_log.insert("end", f"Thư mục lưu: {folder_path}\n"))
+                
+            for i, vid in enumerate(videos_to_download):
+                self.after(0, lambda i=i, vid=vid: self.playlist_log.insert("end", f"[{i+1}/{len(videos_to_download)}] Đang xử lý: {vid.get('title')}...\n"))
+                self.after(0, lambda: self.playlist_log.see("end"))
+                
+                try:
+                    from services.youtube_metadata_service import get_youtube_metadata
+                    from services.transcript_service import get_youtube_transcript
+                    
+                    url = vid.get("url")
+                    metadata = get_youtube_metadata(url)
+                    
+                    mode = self.mode_var.get()
+                    language = self.language_var.get()
+                    whisper_model = self.whisper_model_var.get()
+                    
+                    transcript_text = ""
+                    source_type = "youtube"
+                    
+                    if mode in ("Auto", "Transcript Only"):
+                        try:
+                            transcript_data = get_youtube_transcript(url, language)
+                            transcript_text = "\n".join([item["text"] for item in transcript_data])
+                        except Exception as e:
+                            if mode == "Transcript Only":
+                                raise e
+                            from services.audio_service import download_audio
+                            from services.whisper_service import transcribe_audio
+                            audio_path = download_audio(url, None, lambda x: None)
+                            transcript_text, _, _ = transcribe_audio(audio_path, whisper_model, language, None)
+                            source_type = "whisper"
+                            
+                    elif mode == "Speech-to-Text Only":
+                        from services.audio_service import download_audio
+                        from services.whisper_service import transcribe_audio
+                        audio_path = download_audio(url, None, lambda x: None)
+                        transcript_text, _, _ = transcribe_audio(audio_path, whisper_model, language, None)
+                        source_type = "whisper"
+                        
+                    md_filename = sanitize_filename(f"{metadata['title']}.md")
+                    md_path = folder_path / md_filename
+                    export_markdown(
+                        transcript_text,
+                        metadata,
+                        source_type,
+                        str(md_path),
+                        include_timestamps=False,
+                        chapters=[],
+                        mode="obsidian"
+                    )
+                    
+                    self.after(0, lambda: self.playlist_log.insert("end", " -> OK\n"))
+                except Exception as e:
+                    self.after(0, lambda e=e: self.playlist_log.insert("end", f" -> Lỗi: {e}\n"))
+                    
+            self.after(0, lambda: self.playlist_log.insert("end", "\nHoàn tất tải Playlist!\n"))
+            self.after(0, lambda: self.playlist_start_btn.configure(state="normal"))
+            
+        threading.Thread(target=_batch_process, daemon=True).start()
 
     def _on_clear(self):
         """Clear output and reset state."""

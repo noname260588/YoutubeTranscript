@@ -176,3 +176,55 @@ def get_youtube_metadata(url: str) -> dict:
                 continue
 
     return metadata
+
+def get_playlist_info(url: str) -> list[dict]:
+    """
+    Return list of videos from a YouTube playlist using yt-dlp in flat extraction mode.
+    Returns [{'id': '...', 'title': '...', 'duration': 123, 'url': '...'}, ...]
+    """
+    if not url:
+        return []
+
+    try:
+        import yt_dlp
+    except ImportError:
+        return []
+
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+    }
+
+    attempts = get_cookie_browser_attempts("Auto")
+    for browser in attempts:
+        current_opts = apply_cookie_browser_option(ydl_opts, browser)
+        try:
+            with yt_dlp.YoutubeDL(current_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if not info or 'entries' not in info:
+                    return []
+                
+                videos = []
+                for entry in info['entries']:
+                    if entry and entry.get('id'):
+                        videos.append({
+                            "id": entry.get("id"),
+                            "title": entry.get("title") or "Unknown",
+                            "duration": entry.get("duration") or 0,
+                            "url": entry.get("url") or f"https://www.youtube.com/watch?v={entry.get('id')}"
+                        })
+                return videos
+        except yt_dlp.utils.DownloadError as error:
+            should_retry = (
+                browser is None
+                and len(attempts) > 1
+                and looks_like_youtube_auth_error(str(error))
+            ) or (browser is not None and len(attempts) > 1)
+            if should_retry:
+                continue
+        except Exception:
+            if browser is not None and len(attempts) > 1:
+                continue
+
+    return []
